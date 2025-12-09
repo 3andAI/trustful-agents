@@ -5,6 +5,15 @@ pragma solidity ^0.8.24;
  * @title ITrustfulValidator
  * @notice Issues and revokes ERC-8004 validations based on trust conditions
  * @dev Acts as a validator in the ERC-8004 Validation Registry pattern
+ * 
+ * v1.2 Changes:
+ * - Removed `hasValidMaxPayout` from ValidationConditions (maxPayoutPerClaim is now off-chain)
+ * - Removed `MaxPayoutZero` from RevocationReason
+ * - Updated `getTrustInfo()` to not return maxPayoutPerClaim
+ * - Added `termsContentUri` to getTrustInfo for clients to fetch T&C document
+ * 
+ * Note: maxPayoutPerClaim now lives in the T&C document (off-chain, IPFS).
+ * Clients should fetch the T&C document and read maxPayoutPerClaim from there.
  */
 interface ITrustfulValidator {
     // =========================================================================
@@ -22,7 +31,7 @@ interface ITrustfulValidator {
         None,
         CollateralBelowMinimum,
         TermsNotRegistered,
-        MaxPayoutZero,
+        TermsInvalidated,           // [v1.2] Replaces MaxPayoutZero
         OwnershipChanged,
         ManualRevocation,
         EmergencyPause
@@ -42,9 +51,18 @@ interface ITrustfulValidator {
 
     struct ValidationConditions {
         bool hasMinimumCollateral;    // Collateral >= minimum threshold
-        bool hasTermsRegistered;      // T&C has been registered
-        bool hasValidMaxPayout;       // maxPayoutPerClaim > 0
+        bool hasActiveTerms;          // [v1.2] Renamed: T&C registered and not invalidated
         bool isOwnerValid;            // ERC-8004 ownership is valid
+        bool councilIsActive;         // [v1.2] Added: Assigned council is active
+    }
+
+    struct TrustInfo {
+        uint256 collateralAmount;     // Current collateral balance
+        bytes32 termsHash;            // Active T&C content hash
+        string termsUri;              // [v1.2] URI to fetch T&C document (contains maxPayoutPerClaim)
+        bytes32 councilId;            // Council handling disputes
+        bool isValid;                 // Current validation status
+        bool withdrawalPending;       // [v1.2] Added: Risk signal for clients
     }
 
     // =========================================================================
@@ -153,20 +171,14 @@ interface ITrustfulValidator {
     /**
      * @notice Get trust info for A2A Agent Card extension
      * @param agentId The ERC-8004 token ID
-     * @return collateralAmount Current collateral balance
-     * @return maxPayoutPerClaim Max payout from active terms
-     * @return councilId Council handling disputes
-     * @return isValid Current validation status
+     * @return info The TrustInfo struct
+     * @dev Clients should fetch T&C document from termsUri to get maxPayoutPerClaim
+     * [v1.2] Returns struct instead of tuple, removed maxPayoutPerClaim
      */
     function getTrustInfo(uint256 agentId)
         external
         view
-        returns (
-            uint256 collateralAmount,
-            uint256 maxPayoutPerClaim,
-            bytes32 councilId,
-            bool isValid
-        );
+        returns (TrustInfo memory info);
 
     // =========================================================================
     // Configuration

@@ -4,7 +4,15 @@ pragma solidity ^0.8.24;
 /**
  * @title IClaimsManager
  * @notice Manages the full lifecycle of claims: filing, evidence, voting, resolution
- * @dev Implements claim deposits, payment binding, and partial locking (v1.1)
+ * @dev Implements claim deposits, payment binding, and partial locking
+ * 
+ * v1.2 Changes:
+ * - Added `Expired` status for claims that pass deadline with/without votes
+ * - Added `changeVote()` for council members to modify votes during voting period
+ * - Added `getVotersForClaim()` to support deposit distribution to voters only
+ * - Vote changes overwrite previous vote (only final vote counts for median calculation)
+ * - Updated cancelClaim: deposit is forfeited to council, NOT returned to claimant
+ * - Added VoteChanged event
  */
 interface IClaimsManager {
     // =========================================================================
@@ -14,11 +22,12 @@ interface IClaimsManager {
     enum ClaimStatus {
         Filed,              // Claim submitted, evidence period active
         EvidenceClosed,     // Evidence period ended, voting open
-        VotingClosed,       // Voting period ended, awaiting execution
+        VotingClosed,       // Voting period ended, awaiting finalization
         Approved,           // Claim approved by council
         Rejected,           // Claim rejected by council
         Executed,           // Compensation paid out
-        Cancelled           // Cancelled by claimant (before voting)
+        Cancelled,          // Cancelled by claimant (deposit forfeited)
+        Expired             // [v1.2] Deadline passed (special handling if no votes)
     }
 
     enum Vote {
@@ -40,17 +49,18 @@ interface IClaimsManager {
         uint256 approvedAmount;       // Amount approved by council (may differ)
         bytes32 evidenceHash;         // Hash of evidence document
         string evidenceUri;           // URI to evidence
-        bytes32 paymentReceiptHash;   // x402 payment receipt hash (v1.1)
-        bytes32 termsHashAtClaimTime; // T&C hash when claim filed (v1.1)
+        bytes32 paymentReceiptHash;   // x402 payment receipt hash
+        bytes32 termsHashAtClaimTime; // T&C hash when claim filed
         uint256 termsVersionAtClaimTime; // T&C version when filed
         address providerAtClaimTime;  // Agent owner when claim filed
         bytes32 councilId;            // Council handling this claim
-        uint256 claimantDeposit;      // Deposit staked by claimant (v1.1)
-        uint256 lockedCollateral;     // Collateral locked for this claim (v1.1)
+        uint256 claimantDeposit;      // Deposit staked by claimant
+        uint256 lockedCollateral;     // Collateral locked for this claim
         ClaimStatus status;
         uint256 filedAt;              // Timestamp when filed
         uint256 evidenceDeadline;     // When evidence period ends
         uint256 votingDeadline;       // When voting period ends
+        bool hadVotes;                // [v1.2] True if at least one vote was cast
     }
 
     struct VoteRecord {
@@ -59,6 +69,7 @@ interface IClaimsManager {
         uint256 approvedAmount;       // Amount voter thinks should be approved
         string reasoning;             // Optional reasoning (hash or short text)
         uint256 votedAt;
+        uint256 lastChangedAt;        // [v1.2] Timestamp of last vote change (0 if never changed)
     }
 
     struct ClaimStats {
@@ -66,6 +77,7 @@ interface IClaimsManager {
         uint256 approvedClaims;
         uint256 rejectedClaims;
         uint256 pendingClaims;
+        uint256 expiredClaims;        // [v1.2] Added
         uint256 totalPaidOut;
     }
 
@@ -106,12 +118,36 @@ interface IClaimsManager {
         uint256 approvedAmount
     );
 
+    event VoteChanged(
+        uint256 indexed claimId,
+        address indexed voter,
+        Vote oldVote,
+        Vote newVote,
+        uint256 oldApprovedAmount,
+        uint256 newApprovedAmount
+    );
+
     event ClaimApproved(uint256 indexed claimId, uint256 approvedAmount);
     event ClaimRejected(uint256 indexed claimId);
-    event ClaimCancelled(uint256 indexed claimId, uint256 depositReturned);
+    event ClaimCancelled(uint256 indexed claimId, uint256 depositForfeited);
+    event ClaimExpired(uint256 indexed claimId, bool hadVotes);
     event ClaimExecuted(uint256 indexed claimId, uint256 amountPaid);
-    event DepositForfeited(uint256 indexed claimId, uint256 amount, bytes32 councilId);
-    event DepositReturned(uint256 indexed claimId, uint256 amount, address claimant);
+
+    // =========================================================================
+    // Errors
+    // =========================================================================
+
+    error ClaimNotFound(uint256 claimId);
+    error NotClaimant(uint256 claimId, address caller);
+    error NotCouncilMember(bytes32 councilId, address caller);
+    error InvalidClaimStatus(uint256 claimId, ClaimStatus current, ClaimStatus required);
+    error EvidencePeriodEnded(uint256 claimId);
+    error VotingPeriodEnded(uint256 claimId);
+    error VotingPeriodNotStarted(uint256 claimId);
+    error VotingPeriodNotEnded(uint256 claimId);
+    error AlreadyVoted(uint256 claimId, address voter);
+    error NotYetVoted(uint256 claimId, address voter);
+    error CannotCancelAfterVotingStarts(uint256 claimId);
 
     // =========================================================================
     // Core Functions
@@ -126,7 +162,7 @@ interface IClaimsManager {
      * @param paymentReceiptHash x402 payment receipt hash proving paid service
      * @return claimId The new claim ID
      * @dev Requires prior USDC approval for deposit
-     * @dev Council is derived from agent's active T&C
+     * @dev Council is derived from agent's active T&C (or governance override)
      */
     function fileClaim(
         uint256 agentId,
@@ -170,6 +206,7 @@ interface IClaimsManager {
      * @param reasoning Optional reasoning (can be hash or short text)
      * @dev Only active council members can call
      * @dev Only during voting period
+     * @dev Reverts if already voted (use changeVote instead)
      */
     function castVote(
         uint256 claimId,
@@ -179,18 +216,40 @@ interface IClaimsManager {
     ) external;
 
     /**
-     * @notice Close voting and determine outcome
+     * @notice Change an existing vote during voting period
      * @param claimId The claim ID
-     * @dev Can be called by anyone after voting deadline
-     * @dev Sets status to Approved or Rejected
+     * @param newVote The new vote (Approve/Reject/Abstain)
+     * @param newApprovedAmount New amount to approve (ignored if rejecting)
+     * @param newReasoning New reasoning
+     * @dev Only for council members who have already voted
+     * @dev Only during voting period
+     * @dev Overwrites previous vote entirely (only final vote counts)
+     * [v1.2] New function
      */
-    function closeVoting(uint256 claimId) external;
+    function changeVote(
+        uint256 claimId,
+        Vote newVote,
+        uint256 newApprovedAmount,
+        string calldata newReasoning
+    ) external;
 
     /**
-     * @notice Cancel a claim and reclaim deposit
+     * @notice Finalize a claim after voting period ends
+     * @param claimId The claim ID
+     * @dev Can be called by anyone after voting deadline
+     * @dev Sets status to Approved, Rejected, or Expired based on votes
+     * @dev If expired with no votes, deposit is returned to claimant
+     * @dev If expired with votes OR approved/rejected, deposit goes to voters
+     */
+    function finalizeClaim(uint256 claimId) external;
+
+    /**
+     * @notice Cancel a claim before voting starts
      * @param claimId The claim ID
      * @dev Only claimant can call
-     * @dev Only before voting starts
+     * @dev Only before voting period starts (during evidence period)
+     * @dev Deposit is FORFEITED to voting council members, NOT returned
+     * [v1.2] Updated: deposit forfeited, not returned
      */
     function cancelClaim(uint256 claimId) external;
 
@@ -257,6 +316,18 @@ interface IClaimsManager {
     function getVotes(uint256 claimId) external view returns (VoteRecord[] memory votes);
 
     /**
+     * @notice Get addresses of all council members who voted on a claim
+     * @param claimId The claim ID
+     * @return voters Array of voter addresses
+     * @dev Used for deposit distribution - only voters receive share
+     * [v1.2] New function
+     */
+    function getVotersForClaim(uint256 claimId) 
+        external 
+        view 
+        returns (address[] memory voters);
+
+    /**
      * @notice Get a specific voter's vote
      * @param claimId The claim ID
      * @param voter The voter address
@@ -271,9 +342,9 @@ interface IClaimsManager {
      * @notice Check if a council member has voted on a claim
      * @param claimId The claim ID
      * @param voter The voter address
-     * @return hasVoted True if already voted
+     * @return voted True if already voted
      */
-    function hasVoted(uint256 claimId, address voter) external view returns (bool hasVoted);
+    function hasVoted(uint256 claimId, address voter) external view returns (bool voted);
 
     /**
      * @notice Get claim statistics for an agent
@@ -287,7 +358,7 @@ interface IClaimsManager {
      * @param agentId The ERC-8004 token ID
      * @param claimedAmount The amount to be claimed
      * @return deposit The required deposit amount
-     * @dev Uses council's claimDepositPercentage from agent's active T&C
+     * @dev Uses council's claimDepositPercentage from agent's assigned council
      */
     function calculateRequiredDeposit(uint256 agentId, uint256 claimedAmount)
         external
@@ -299,4 +370,15 @@ interface IClaimsManager {
      * @return nextId The next claim ID that will be assigned
      */
     function nextClaimId() external view returns (uint256 nextId);
+
+    /**
+     * @notice Calculate the median approved amount from approval votes
+     * @param claimId The claim ID
+     * @return medianAmount The median of approved amounts
+     * @dev Only considers Approve votes, ignores Reject and Abstain
+     */
+    function calculateMedianApprovedAmount(uint256 claimId) 
+        external 
+        view 
+        returns (uint256 medianAmount);
 }
