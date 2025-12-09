@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { Test, console2 } from "forge-std/Test.sol";
-import { CollateralVault, IERC8004Registry } from "../src/core/CollateralVault.sol";
+import { Test } from "forge-std/Test.sol";
+import { CollateralVault } from "../src/core/CollateralVault.sol";
 import { ICollateralVault } from "../src/interfaces/ICollateralVault.sol";
 import { ITrustfulPausable } from "../src/interfaces/ITrustfulPausable.sol";
 import { TrustfulPausable } from "../src/base/TrustfulPausable.sol";
