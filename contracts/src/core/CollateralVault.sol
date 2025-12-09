@@ -35,13 +35,13 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
     // =========================================================================
 
     /// @notice The USDC token contract
-    IERC20 private immutable _usdc;
+    IERC20 private immutable _USDC;
 
     /// @notice The ERC-8004 agent registry
-    IERC8004Registry private immutable _registry;
+    IERC8004Registry private immutable _REGISTRY;
 
     /// @notice The withdrawal grace period
-    uint256 private immutable _gracePeriod;
+    uint256 private immutable _GRACE_PERIOD;
 
     // =========================================================================
     // State
@@ -95,9 +95,9 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         if (usdc_ == address(0) || registry_ == address(0)) {
             revert ZeroAddress();
         }
-        _usdc = IERC20(usdc_);
-        _registry = IERC8004Registry(registry_);
-        _gracePeriod = gracePeriod_ > 0 ? gracePeriod_ : DEFAULT_GRACE_PERIOD;
+        _USDC = IERC20(usdc_);
+        _REGISTRY = IERC8004Registry(registry_);
+        _GRACE_PERIOD = gracePeriod_ > 0 ? gracePeriod_ : DEFAULT_GRACE_PERIOD;
     }
 
     // =========================================================================
@@ -138,7 +138,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
 
         _accounts[agentId].balance += amount;
 
-        _usdc.safeTransferFrom(msg.sender, address(this), amount);
+        _USDC.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Deposited(agentId, msg.sender, amount);
     }
@@ -164,7 +164,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         account.withdrawalInitiatedAt = block.timestamp;
         account.withdrawalAmount = amount;
 
-        uint256 executeAfter = block.timestamp + _gracePeriod;
+        uint256 executeAfter = block.timestamp + _GRACE_PERIOD;
         emit WithdrawalInitiated(agentId, amount, executeAfter);
     }
 
@@ -196,7 +196,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
             revert NoWithdrawalPending(agentId);
         }
 
-        uint256 executeAfter = account.withdrawalInitiatedAt + _gracePeriod;
+        uint256 executeAfter = account.withdrawalInitiatedAt + _GRACE_PERIOD;
         if (block.timestamp < executeAfter) {
             revert GracePeriodNotElapsed(agentId, executeAfter);
         }
@@ -219,7 +219,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         account.balance -= amount;
 
         address recipient = _getAgentOwner(agentId);
-        _usdc.safeTransfer(recipient, amount);
+        _USDC.safeTransfer(recipient, amount);
 
         emit WithdrawalExecuted(agentId, recipient, amount);
     }
@@ -297,7 +297,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
             account.balance -= actualSlash;
             _lockedByClaim[agentId][claimId] -= actualSlash;
 
-            _usdc.safeTransfer(recipient, actualSlash);
+            _USDC.safeTransfer(recipient, actualSlash);
 
             emit CollateralSlashed(agentId, claimId, recipient, actualSlash);
         }
@@ -325,23 +325,23 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
             return false;
         }
 
-        uint256 executeAfter = account.withdrawalInitiatedAt + _gracePeriod;
+        uint256 executeAfter = account.withdrawalInitiatedAt + _GRACE_PERIOD;
         return block.timestamp >= executeAfter;
     }
 
     /// @inheritdoc ICollateralVault
     function usdcToken() external view returns (address usdc) {
-        return address(_usdc);
+        return address(_USDC);
     }
 
     /// @inheritdoc ICollateralVault
     function gracePeriod() external view returns (uint256 period) {
-        return _gracePeriod;
+        return _GRACE_PERIOD;
     }
 
     /// @inheritdoc ICollateralVault
     function agentRegistry() external view returns (address registry) {
-        return address(_registry);
+        return address(_REGISTRY);
     }
 
     /**
@@ -390,7 +390,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
      * @return owner The owner address
      */
     function _getAgentOwner(uint256 agentId) internal view returns (address) {
-        return _registry.ownerOf(agentId);
+        return _REGISTRY.ownerOf(agentId);
     }
 
     /**
@@ -399,7 +399,7 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
      * @return exists True if the agent exists
      */
     function _agentExists(uint256 agentId) internal view returns (bool) {
-        try _registry.ownerOf(agentId) returns (address owner) {
+        try _REGISTRY.ownerOf(agentId) returns (address owner) {
             return owner != address(0);
         } catch {
             return false;
