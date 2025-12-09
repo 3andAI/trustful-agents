@@ -5,6 +5,7 @@ import { Test, console2 } from "forge-std/Test.sol";
 import { CollateralVault, IERC8004Registry } from "../src/core/CollateralVault.sol";
 import { ICollateralVault } from "../src/interfaces/ICollateralVault.sol";
 import { ITrustfulPausable } from "../src/interfaces/ITrustfulPausable.sol";
+import { TrustfulPausable } from "../src/base/TrustfulPausable.sol";
 import { ERC20Mock } from "./mocks/ERC20Mock.sol";
 import { ERC8004RegistryMock } from "./mocks/ERC8004RegistryMock.sol";
 
@@ -623,13 +624,13 @@ contract CollateralVaultTest is Test {
 
     function test_SetClaimsManager_RevertsIfNotGovernance() public {
         vm.prank(provider);
-        vm.expectRevert(abi.encodeWithSelector(CollateralVault.NotGovernance.selector, provider));
+        vm.expectRevert(abi.encodeWithSelector(TrustfulPausable.NotGovernance.selector, provider));
         vault.setClaimsManager(makeAddr("new"));
     }
 
     function test_SetRulingExecutor_RevertsIfNotGovernance() public {
         vm.prank(provider);
-        vm.expectRevert(abi.encodeWithSelector(CollateralVault.NotGovernance.selector, provider));
+        vm.expectRevert(abi.encodeWithSelector(TrustfulPausable.NotGovernance.selector, provider));
         vault.setRulingExecutor(makeAddr("new"));
     }
 
