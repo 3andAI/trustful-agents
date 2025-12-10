@@ -456,6 +456,8 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
         bytes memory buffer = new bytes(digits);
         while (value != 0) {
             digits -= 1;
+            // Safe: value % 10 is always 0-9, so 48 + (0-9) = 48-57, fits in uint8
+            // forge-lint: disable-next-line(unsafe-typecast)
             buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
             value /= 10;
         }
