@@ -227,25 +227,33 @@ contract DeployMVP is Script {
     }
 
     function _writeDeploymentFile() internal {
-        string memory json = string(
-            abi.encodePacked(
-                "{\n",
-                '  "chainId": ', vm.toString(block.chainid), ",\n",
-                '  "usdc": "', vm.toString(usdc), '",\n',
-                '  "erc8004Registry": "', vm.toString(erc8004Registry), '",\n',
-                '  "collateralVault": "', vm.toString(collateralVault), '",\n',
-                '  "termsRegistry": "', vm.toString(termsRegistry), '",\n',
-                '  "trustfulValidator": "', vm.toString(trustfulValidator), '",\n',
-                '  "mockUsdc": "', vm.toString(mockUsdc), '",\n',
-                '  "mockErc8004Registry": "', vm.toString(mockErc8004Registry), '"\n',
-                "}"
-            )
-        );
-
         string memory filename = string(
             abi.encodePacked("deployments/", vm.toString(block.chainid), ".json")
         );
 
+        // Build JSON in parts to avoid stack too deep
+        string memory part1 = string(abi.encodePacked(
+            "{\n",
+            '  "chainId": ', vm.toString(block.chainid), ",\n",
+            '  "usdc": "', vm.toString(usdc), '",\n',
+            '  "erc8004Registry": "', vm.toString(erc8004Registry), '",\n'
+        ));
+
+        string memory part2 = string(abi.encodePacked(
+            '  "collateralVault": "', vm.toString(collateralVault), '",\n',
+            '  "termsRegistry": "', vm.toString(termsRegistry), '",\n',
+            '  "trustfulValidator": "', vm.toString(trustfulValidator), '",\n'
+        ));
+
+        string memory part3 = string(abi.encodePacked(
+            '  "mockUsdc": "', vm.toString(mockUsdc), '",\n',
+            '  "mockErc8004Registry": "', vm.toString(mockErc8004Registry), '"\n',
+            "}"
+        ));
+
+        string memory json = string(abi.encodePacked(part1, part2, part3));
+
+        // forge-lint: disable-next-line unsafe-cheatcode
         vm.writeFile(filename, json);
         console.log("Deployment addresses written to:", filename);
     }
