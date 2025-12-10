@@ -6,8 +6,6 @@ import { TrustfulValidator } from "../src/core/TrustfulValidator.sol";
 import { CollateralVault } from "../src/core/CollateralVault.sol";
 import { TermsRegistry } from "../src/core/TermsRegistry.sol";
 import { ITrustfulValidator } from "../src/interfaces/ITrustfulValidator.sol";
-import { ICollateralVault } from "../src/interfaces/ICollateralVault.sol";
-import { ITermsRegistry } from "../src/interfaces/ITermsRegistry.sol";
 import { TrustfulPausable } from "../src/base/TrustfulPausable.sol";
 import { ERC20Mock } from "./mocks/ERC20Mock.sol";
 import { ERC8004RegistryMock } from "./mocks/ERC8004RegistryMock.sol";
@@ -560,7 +558,7 @@ contract TrustfulValidatorTest is Test {
 
         // 3. Provider requests validation
         vm.prank(provider);
-        bytes32 requestHash = validator.requestValidation(AGENT_ID);
+        validator.requestValidation(AGENT_ID);
         assertTrue(validator.isValidated(AGENT_ID));
 
         // 4. Client checks trust info
