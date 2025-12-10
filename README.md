@@ -54,6 +54,8 @@ trustful-agents/
 - pnpm >= 8
 - Foundry (forge, cast, anvil)
 
+> **New to development?** See [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md) for complete installation instructions for Windows and macOS.
+
 ## Quick Start
 
 ### 1. Install dependencies
