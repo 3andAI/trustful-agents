@@ -568,7 +568,7 @@ contract TrustfulValidatorTest is Test {
 
         // 5. Provider initiates withdrawal (client sees risk signal)
         vm.prank(provider);
-        vault.initiateWithdrawal(AGENT_ID, DEPOSIT_AMOUNT - MIN_COLLATERAL);
+        vault.initiateWithdrawal(AGENT_ID, DEPOSIT_AMOUNT - MIN_COLLATERAL + 1);
         info = validator.getTrustInfo(AGENT_ID);
         assertTrue(info.withdrawalPending);
 
