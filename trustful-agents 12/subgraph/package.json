@@ -1,0 +1,27 @@
+{
+  "name": "@trustful-agents/subgraph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Graph indexer for Trustful Agents",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/trustful-agents.git",
+    "directory": "subgraph"
+  },
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --studio trustful-agents",
+    "deploy:hosted": "graph deploy --product hosted-service YOUR_GITHUB/trustful-agents",
+    "create:local": "graph create --node http://localhost:8020/ trustful-agents",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 trustful-agents",
+    "test": "graph test"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "^0.32.0"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.68.0",
+    "matchstick-as": "^0.6.0"
+  }
+}
