@@ -42,20 +42,36 @@ abstract contract TrustfulPausable is ITrustfulPausable {
     // =========================================================================
 
     modifier onlyGovernance() {
-        if (msg.sender != governance) revert NotGovernance(msg.sender);
+        _checkGovernance();
         _;
     }
 
     modifier onlyPauser() {
-        if (!_pausers[msg.sender]) revert NotPauser(msg.sender);
+        _checkPauser();
         _;
     }
 
     modifier whenNotPaused(PauseScope scope) {
+        _checkNotPaused(scope);
+        _;
+    }
+
+    // =========================================================================
+    // Internal Modifier Logic
+    // =========================================================================
+
+    function _checkGovernance() internal view {
+        if (msg.sender != governance) revert NotGovernance(msg.sender);
+    }
+
+    function _checkPauser() internal view {
+        if (!_pausers[msg.sender]) revert NotPauser(msg.sender);
+    }
+
+    function _checkNotPaused(PauseScope scope) internal view {
         if (_pausedScopes[PauseScope.All] || _pausedScopes[scope]) {
             revert AlreadyPaused(scope);
         }
-        _;
     }
 
     // =========================================================================

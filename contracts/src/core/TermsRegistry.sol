@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import { ITermsRegistry } from "../interfaces/ITermsRegistry.sol";
-import { ITrustfulPausable } from "../interfaces/ITrustfulPausable.sol";
 import { TrustfulPausable } from "../base/TrustfulPausable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
