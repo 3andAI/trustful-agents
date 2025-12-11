@@ -218,7 +218,7 @@ contract CouncilRegistryTest is Test {
 
         ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
         assertEq(council.memberCount, 1);
-        assertTrue(registry.isMember(councilId, member1));
+        assertTrue(registry.isActiveMember(councilId, member1));
     }
 
     function test_AddMember_RevertsOnNonGovernance() public {
@@ -259,7 +259,7 @@ contract CouncilRegistryTest is Test {
 
         ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
         assertEq(council.memberCount, 2);
-        assertFalse(registry.isMember(councilId, member1));
+        assertFalse(registry.isActiveMember(councilId, member1));
     }
 
     function test_RemoveMember_RevertsOnNonMember() public {
@@ -279,9 +279,10 @@ contract CouncilRegistryTest is Test {
         vm.prank(governance);
         registry.suspendMember(councilId, member1);
 
-        // Member is still a member but suspended (can't vote)
-        assertTrue(registry.isMember(councilId, member1));
-        assertFalse(registry.canVote(councilId, member1));
+        // Member is suspended (not active but still exists)
+        ICouncilRegistry.CouncilMember memory memberData = registry.getMember(councilId, member1);
+        assertTrue(memberData.joinedAt != 0); // Still exists
+        assertFalse(registry.isActiveMember(councilId, member1)); // But not active
     }
 
     function test_ReinstateMember_Success() public {
@@ -296,7 +297,7 @@ contract CouncilRegistryTest is Test {
         registry.reinstateMember(councilId, member1);
         vm.stopPrank();
 
-        assertTrue(registry.canVote(councilId, member1));
+        assertTrue(registry.isActiveMember(councilId, member1));
     }
 
     // =========================================================================
