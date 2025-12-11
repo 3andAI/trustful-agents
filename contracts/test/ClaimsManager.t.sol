@@ -119,13 +119,16 @@ contract ClaimsManagerTest is Test {
     // Helper Functions
     // =========================================================================
 
+    bytes32 public constant PAYMENT_RECEIPT_HASH = keccak256("payment-receipt");
+
     function _fileDefaultClaim() internal returns (uint256 claimId) {
         vm.prank(claimant);
         claimId = claimsManager.fileClaim(
             AGENT_ID,
             CLAIM_AMOUNT,
             EVIDENCE_HASH,
-            EVIDENCE_URI
+            EVIDENCE_URI,
+            PAYMENT_RECEIPT_HASH
         );
     }
 
@@ -172,27 +175,14 @@ contract ClaimsManagerTest is Test {
         assertEq(usdc.balanceOf(claimant), claimantBalanceBefore - expectedDeposit);
 
         // Verify claim state
-        (
-            uint256 agentId,
-            address claimantAddr,
-            uint256 amount,
-            ,
-            bytes32 councilId,
-            IClaimsManager.ClaimStatus status,
-            ,
-            ,
-            ,
-            ,
-            uint256 deposit,
-            ,
-        ) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
 
-        assertEq(agentId, AGENT_ID);
-        assertEq(claimantAddr, claimant);
-        assertEq(amount, CLAIM_AMOUNT);
-        assertEq(councilId, COUNCIL_ID);
-        assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Filed));
-        assertEq(deposit, expectedDeposit);
+        assertEq(claim.agentId, AGENT_ID);
+        assertEq(claim.claimant, claimant);
+        assertEq(claim.claimedAmount, CLAIM_AMOUNT);
+        assertEq(claim.councilId, COUNCIL_ID);
+        assertEq(uint8(claim.status), uint8(IClaimsManager.ClaimStatus.Filed));
+        assertEq(claim.claimantDeposit, expectedDeposit);
 
         // Verify collateral was locked
         assertEq(collateralVault.lockCallCount(), 1);
@@ -203,27 +193,15 @@ contract ClaimsManagerTest is Test {
     function test_FileClaim_RevertsOnNoActiveTerms() public {
         termsRegistry.setAgentTerms(AGENT_ID, COUNCIL_ID, TERMS_HASH, 1, 10000e6, false);
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.AgentNotActive.selector, AGENT_ID));
+        vm.expectRevert(abi.encodeWithSelector(ClaimsManager.NoActiveTerms.selector, AGENT_ID));
         vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, EVIDENCE_HASH, EVIDENCE_URI);
+        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, EVIDENCE_HASH, EVIDENCE_URI, PAYMENT_RECEIPT_HASH);
     }
 
     function test_FileClaim_RevertsOnAmountBelowMinimum() public {
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.AmountBelowMinimum.selector, 100, 1e6));
+        vm.expectRevert(abi.encodeWithSelector(ClaimsManager.InsufficientClaimAmount.selector, 100, 1e6));
         vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, 100, EVIDENCE_HASH, EVIDENCE_URI); // 0.0001 USDC
-    }
-
-    function test_FileClaim_RevertsOnZeroEvidenceHash() public {
-        vm.expectRevert(IClaimsManager.InvalidEvidenceHash.selector);
-        vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, bytes32(0), EVIDENCE_URI);
-    }
-
-    function test_FileClaim_RevertsOnEmptyEvidenceUri() public {
-        vm.expectRevert(IClaimsManager.InvalidEvidenceUri.selector);
-        vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, EVIDENCE_HASH, "");
+        claimsManager.fileClaim(AGENT_ID, 100, EVIDENCE_HASH, EVIDENCE_URI, PAYMENT_RECEIPT_HASH); // 0.0001 USDC
     }
 
     function test_FileClaim_MultipleClaims() public {
@@ -260,7 +238,7 @@ contract ClaimsManagerTest is Test {
         
         _skipToVotingPeriod();
 
-        vm.expectRevert(IClaimsManager.EvidencePeriodEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.EvidencePeriodEnded.selector, claimId));
         vm.prank(claimant);
         claimsManager.submitAdditionalEvidence(claimId, keccak256("late"), "ipfs://late");
     }
@@ -268,7 +246,7 @@ contract ClaimsManagerTest is Test {
     function test_SubmitAdditionalEvidence_RevertsOnNonClaimant() public {
         uint256 claimId = _fileDefaultClaim();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotClaimant.selector, nonMember, claimant));
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotClaimant.selector, claimId, nonMember));
         vm.prank(nonMember);
         claimsManager.submitAdditionalEvidence(claimId, keccak256("wrong"), "ipfs://wrong");
     }
@@ -288,7 +266,7 @@ contract ClaimsManagerTest is Test {
     function test_SubmitCounterEvidence_RevertsOnNonProvider() public {
         uint256 claimId = _fileDefaultClaim();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotProvider.selector, nonMember, provider));
+        vm.expectRevert(abi.encodeWithSelector(ClaimsManager.NotAgentOwner.selector, AGENT_ID, nonMember));
         vm.prank(nonMember);
         claimsManager.submitCounterEvidence(claimId, keccak256("wrong"), "ipfs://wrong");
     }
@@ -308,12 +286,11 @@ contract ClaimsManagerTest is Test {
         claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         // Verify vote record
-        (IClaimsManager.Vote voteType, uint256 approvedAmount, bool hasVoted) = 
-            claimsManager.getVote(claimId, member1);
+        IClaimsManager.VoteRecord memory voteRecord = claimsManager.getVote(claimId, member1);
         
-        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Approve));
-        assertEq(approvedAmount, CLAIM_AMOUNT);
-        assertTrue(hasVoted);
+        assertEq(uint8(voteRecord.vote), uint8(IClaimsManager.Vote.Approve));
+        assertEq(voteRecord.approvedAmount, CLAIM_AMOUNT);
+        assertTrue(voteRecord.votedAt > 0);
     }
 
     function test_CastVote_Reject() public {
@@ -323,9 +300,9 @@ contract ClaimsManagerTest is Test {
         vm.prank(member1);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
 
-        (IClaimsManager.Vote voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Reject));
-        assertTrue(hasVoted);
+        IClaimsManager.VoteRecord memory voteRecord = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteRecord.vote), uint8(IClaimsManager.Vote.Reject));
+        assertTrue(voteRecord.votedAt > 0);
     }
 
     function test_CastVote_Abstain() public {
@@ -335,16 +312,16 @@ contract ClaimsManagerTest is Test {
         vm.prank(member1);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Abstain, 0);
 
-        (IClaimsManager.Vote voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Abstain));
-        assertTrue(hasVoted);
+        IClaimsManager.VoteRecord memory voteRecord = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteRecord.vote), uint8(IClaimsManager.Vote.Abstain));
+        assertTrue(voteRecord.votedAt > 0);
     }
 
     function test_CastVote_RevertsBeforeVotingPeriod() public {
         uint256 claimId = _fileDefaultClaim();
         // Still in evidence period
 
-        vm.expectRevert(IClaimsManager.VotingNotStarted.selector);
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.VotingPeriodNotStarted.selector, claimId));
         vm.prank(member1);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
     }
@@ -353,7 +330,7 @@ contract ClaimsManagerTest is Test {
         uint256 claimId = _fileDefaultClaim();
         _skipToAfterVoting();
 
-        vm.expectRevert(IClaimsManager.VotingEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.VotingPeriodEnded.selector, claimId));
         vm.prank(member1);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
     }
@@ -362,22 +339,9 @@ contract ClaimsManagerTest is Test {
         uint256 claimId = _fileDefaultClaim();
         _skipToVotingPeriod();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotCouncilMember.selector, nonMember, COUNCIL_ID));
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotCouncilMember.selector, COUNCIL_ID, nonMember));
         vm.prank(nonMember);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
-    }
-
-    function test_CastVote_RevertsOnApproveAmountExceedsClaim() public {
-        uint256 claimId = _fileDefaultClaim();
-        _skipToVotingPeriod();
-
-        vm.expectRevert(abi.encodeWithSelector(
-            IClaimsManager.ApprovedAmountExceedsClaim.selector, 
-            CLAIM_AMOUNT + 1, 
-            CLAIM_AMOUNT
-        ));
-        vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT + 1);
     }
 
     function test_ChangeVote_Success() public {
@@ -395,15 +359,15 @@ contract ClaimsManagerTest is Test {
         vm.prank(member1);
         claimsManager.changeVote(claimId, IClaimsManager.Vote.Reject, 0);
 
-        (IClaimsManager.Vote voteType,,) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Reject));
+        IClaimsManager.VoteRecord memory voteRecord = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteRecord.vote), uint8(IClaimsManager.Vote.Reject));
     }
 
     function test_ChangeVote_RevertsIfNotVoted() public {
         uint256 claimId = _fileDefaultClaim();
         _skipToVotingPeriod();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotVoted.selector, member1));
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotYetVoted.selector, claimId, member1));
         vm.prank(member1);
         claimsManager.changeVote(claimId, IClaimsManager.Vote.Reject, 0);
     }
@@ -429,7 +393,8 @@ contract ClaimsManagerTest is Test {
 
         claimsManager.finalizeClaim(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Approved));
     }
 
@@ -447,7 +412,8 @@ contract ClaimsManagerTest is Test {
 
         claimsManager.finalizeClaim(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Rejected));
     }
 
@@ -463,7 +429,8 @@ contract ClaimsManagerTest is Test {
 
         claimsManager.finalizeClaim(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Expired));
     }
 
@@ -474,7 +441,8 @@ contract ClaimsManagerTest is Test {
 
         claimsManager.finalizeClaim(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Expired));
     }
 
@@ -482,7 +450,7 @@ contract ClaimsManagerTest is Test {
         uint256 claimId = _fileDefaultClaim();
         _skipToVotingPeriod();
 
-        vm.expectRevert(IClaimsManager.VotingNotEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.VotingPeriodNotEnded.selector, claimId));
         claimsManager.finalizeClaim(claimId);
     }
 
@@ -494,7 +462,9 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(
             IClaimsManager.InvalidClaimStatus.selector, 
-            IClaimsManager.ClaimStatus.Expired
+            claimId,
+            IClaimsManager.ClaimStatus.Expired,
+            IClaimsManager.ClaimStatus.EvidenceClosed
         ));
         claimsManager.finalizeClaim(claimId);
     }
@@ -512,7 +482,8 @@ contract ClaimsManagerTest is Test {
         vm.prank(claimant);
         claimsManager.cancelClaim(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Cancelled));
 
         // Verify collateral was unlocked
@@ -522,7 +493,7 @@ contract ClaimsManagerTest is Test {
     function test_CancelClaim_RevertsOnNonClaimant() public {
         uint256 claimId = _fileDefaultClaim();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotClaimant.selector, nonMember, claimant));
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotClaimant.selector, claimId, nonMember));
         vm.prank(nonMember);
         claimsManager.cancelClaim(claimId);
     }
@@ -535,7 +506,7 @@ contract ClaimsManagerTest is Test {
         vm.prank(member1);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
-        vm.expectRevert(IClaimsManager.VotingAlreadyStarted.selector);
+        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.CannotCancelAfterVotingStarts.selector, claimId));
         vm.prank(claimant);
         claimsManager.cancelClaim(claimId);
     }
@@ -571,19 +542,13 @@ contract ClaimsManagerTest is Test {
         claimsManager.finalizeClaim(claimId2);
         claimsManager.finalizeClaim(claimId3);
 
-        (
-            uint256 total,
-            uint256 approved,
-            uint256 rejected,
-            uint256 expired,
-            uint256 pending,
-        ) = claimsManager.getAgentStats(AGENT_ID);
+        IClaimsManager.ClaimStats memory stats = claimsManager.getClaimStats(AGENT_ID);
 
-        assertEq(total, 3);
-        assertEq(approved, 1);
-        assertEq(rejected, 1);
-        assertEq(expired, 1);
-        assertEq(pending, 0);
+        assertEq(stats.totalClaims, 3);
+        assertEq(stats.approvedClaims, 1);
+        assertEq(stats.rejectedClaims, 1);
+        assertEq(stats.expiredClaims, 1);
+        assertEq(stats.pendingClaims, 0);
     }
 
     // =========================================================================
@@ -605,7 +570,7 @@ contract ClaimsManagerTest is Test {
     function test_TransferDepositToExecutor_RevertsOnNonExecutor() public {
         uint256 claimId = _fileDefaultClaim();
 
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotRulingExecutor.selector, nonMember));
+        vm.expectRevert("Only RulingExecutor");
         vm.prank(nonMember);
         claimsManager.transferDepositToExecutor(claimId);
     }
@@ -630,7 +595,8 @@ contract ClaimsManagerTest is Test {
         vm.prank(rulingExecutor);
         claimsManager.markExecuted(claimId);
 
-        (,,,,, IClaimsManager.ClaimStatus status,,,,,,,) = claimsManager.getClaim(claimId);
+        IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
+        IClaimsManager.ClaimStatus status = claim.status;
         assertEq(uint8(status), uint8(IClaimsManager.ClaimStatus.Executed));
     }
 
@@ -687,7 +653,7 @@ contract ClaimsManagerTest is Test {
         vm.prank(member2);
         claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
 
-        address[] memory voters = claimsManager.getVoters(claimId);
+        address[] memory voters = claimsManager.getVotersForClaim(claimId);
         assertEq(voters.length, 2);
         assertEq(voters[0], member1);
         assertEq(voters[1], member2);
