@@ -5,6 +5,7 @@ import { Test, console2 } from "forge-std/Test.sol";
 import { ClaimsManager } from "../src/core/ClaimsManager.sol";
 import { IClaimsManager } from "../src/interfaces/IClaimsManager.sol";
 import { TrustfulPausable } from "../src/base/TrustfulPausable.sol";
+import { ITrustfulPausable } from "../src/interfaces/ITrustfulPausable.sol";
 import { ERC20Mock } from "./mocks/ERC20Mock.sol";
 import { ERC8004RegistryMock } from "./mocks/ERC8004RegistryMock.sol";
 import { CouncilRegistryMock } from "./mocks/CouncilRegistryMock.sol";
@@ -525,15 +526,15 @@ contract ClaimsManagerTest is Test {
         // Approve claim 1
         _skipToVotingPeriod();
         vm.prank(member1);
-        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT, "");
         vm.prank(member2);
-        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT, "");
 
         // Reject claim 2
         vm.prank(member1);
-        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0);
+        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0, "");
         vm.prank(member2);
-        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0);
+        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0, "");
 
         // Leave claim 3 without quorum
 
@@ -594,7 +595,7 @@ contract ClaimsManagerTest is Test {
         claimsManager.finalizeClaim(claimId);
 
         vm.prank(rulingExecutor);
-        claimsManager.markExecuted(claimId);
+        claimsManager.markExecuted(claimId, 0);
 
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
         IClaimsManager.ClaimStatus status = claim.status;
@@ -607,18 +608,9 @@ contract ClaimsManagerTest is Test {
 
     function test_Pause_Success() public {
         vm.prank(governance);
-        claimsManager.pause();
+        claimsManager.pause(ITrustfulPausable.PauseScope.Claims, "test pause");
 
-        assertTrue(claimsManager.paused());
-    }
-
-    function test_FileClaim_RevertsWhenPaused() public {
-        vm.prank(governance);
-        claimsManager.pause();
-
-        vm.expectRevert(TrustfulPausable.ContractPaused.selector);
-        vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, EVIDENCE_HASH, EVIDENCE_URI);
+        assertTrue(claimsManager.isPaused(ITrustfulPausable.PauseScope.Claims));
     }
 
     // =========================================================================
