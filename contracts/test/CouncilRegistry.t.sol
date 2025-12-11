@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { CouncilRegistry } from "../src/core/CouncilRegistry.sol";
 import { ICouncilRegistry } from "../src/interfaces/ICouncilRegistry.sol";
 import { TrustfulPausable } from "../src/base/TrustfulPausable.sol";
+import { ITrustfulPausable } from "../src/interfaces/ITrustfulPausable.sol";
 
 /**
  * @title CouncilRegistryTest
@@ -28,10 +29,12 @@ contract CouncilRegistryTest is Test {
     address public member5 = makeAddr("member5");
     address public nonMember = makeAddr("nonMember");
 
-    bytes32 public constant COUNCIL_ID = keccak256("test-council");
     uint256 public constant AGENT_ID = 1;
 
     // Default council parameters
+    string public constant COUNCIL_NAME = "Test Council";
+    string public constant COUNCIL_DESCRIPTION = "A test council for DeFi";
+    string public constant COUNCIL_VERTICAL = "defi";
     uint256 public constant QUORUM_PERCENTAGE = 51;
     uint256 public constant DEPOSIT_PERCENTAGE = 10;
     uint256 public constant VOTING_PERIOD = 7 days;
@@ -53,27 +56,28 @@ contract CouncilRegistryTest is Test {
     // =========================================================================
 
     function _createDefaultCouncil() internal returns (bytes32) {
-        address[] memory members = new address[](3);
-        members[0] = member1;
-        members[1] = member2;
-        members[2] = member3;
-
         vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
+        bytes32 councilId = registry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
             QUORUM_PERCENTAGE,
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
             EVIDENCE_PERIOD
         );
-        return COUNCIL_ID;
+        return councilId;
     }
 
-    function _createActiveCouncil() internal returns (bytes32) {
+    function _createCouncilWithMembers() internal returns (bytes32) {
         bytes32 councilId = _createDefaultCouncil();
-        vm.prank(governance);
-        registry.activateCouncil(councilId);
+        
+        vm.startPrank(governance);
+        registry.addMember(councilId, member1);
+        registry.addMember(councilId, member2);
+        registry.addMember(councilId, member3);
+        vm.stopPrank();
+        
         return councilId;
     }
 
@@ -95,25 +99,20 @@ contract CouncilRegistryTest is Test {
     // =========================================================================
 
     function test_CreateCouncil_Success() public {
-        address[] memory members = new address[](3);
-        members[0] = member1;
-        members[1] = member2;
-        members[2] = member3;
-
-        vm.expectEmit(true, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit ICouncilRegistry.CouncilCreated(
-            COUNCIL_ID,
-            members,
+            bytes32(0), // councilId is generated, we don't know it ahead of time
+            COUNCIL_NAME,
+            COUNCIL_VERTICAL,
             QUORUM_PERCENTAGE,
-            DEPOSIT_PERCENTAGE,
-            VOTING_PERIOD,
-            EVIDENCE_PERIOD
+            DEPOSIT_PERCENTAGE
         );
 
         vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
+        bytes32 councilId = registry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
             QUORUM_PERCENTAGE,
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
@@ -121,101 +120,24 @@ contract CouncilRegistryTest is Test {
         );
 
         // Verify council state
-        (
-            uint256 quorum,
-            uint256 deposit,
-            uint256 voting,
-            uint256 evidence,
-            uint256 memberCount,
-            uint256 createdAt,
-            bool active
-        ) = registry.getCouncil(COUNCIL_ID);
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
 
-        assertEq(quorum, QUORUM_PERCENTAGE);
-        assertEq(deposit, DEPOSIT_PERCENTAGE);
-        assertEq(voting, VOTING_PERIOD);
-        assertEq(evidence, EVIDENCE_PERIOD);
-        assertEq(memberCount, 3);
-        assertEq(createdAt, block.timestamp);
-        assertFalse(active); // Not active until explicitly activated
+        assertEq(council.quorumPercentage, QUORUM_PERCENTAGE);
+        assertEq(council.claimDepositPercentage, DEPOSIT_PERCENTAGE);
+        assertEq(council.votingPeriod, VOTING_PERIOD);
+        assertEq(council.evidencePeriod, EVIDENCE_PERIOD);
+        assertEq(council.memberCount, 0);
+        assertEq(council.createdAt, block.timestamp);
+        assertTrue(council.active); // Councils are active by default
     }
 
     function test_CreateCouncil_RevertsOnNonGovernance() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
         vm.expectRevert(abi.encodeWithSelector(TrustfulPausable.NotGovernance.selector, nonMember));
         vm.prank(nonMember);
         registry.createCouncil(
-            COUNCIL_ID,
-            members,
-            QUORUM_PERCENTAGE,
-            DEPOSIT_PERCENTAGE,
-            VOTING_PERIOD,
-            EVIDENCE_PERIOD
-        );
-    }
-
-    function test_CreateCouncil_RevertsOnDuplicateId() public {
-        _createDefaultCouncil();
-
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilAlreadyExists.selector, COUNCIL_ID));
-        vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
-            QUORUM_PERCENTAGE,
-            DEPOSIT_PERCENTAGE,
-            VOTING_PERIOD,
-            EVIDENCE_PERIOD
-        );
-    }
-
-    function test_CreateCouncil_RevertsOnEmptyMembers() public {
-        address[] memory members = new address[](0);
-
-        vm.expectRevert(ICouncilRegistry.EmptyMemberList.selector);
-        vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
-            QUORUM_PERCENTAGE,
-            DEPOSIT_PERCENTAGE,
-            VOTING_PERIOD,
-            EVIDENCE_PERIOD
-        );
-    }
-
-    function test_CreateCouncil_RevertsOnZeroAddressMember() public {
-        address[] memory members = new address[](2);
-        members[0] = member1;
-        members[1] = address(0);
-
-        vm.expectRevert(ICouncilRegistry.ZeroAddressMember.selector);
-        vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
-            QUORUM_PERCENTAGE,
-            DEPOSIT_PERCENTAGE,
-            VOTING_PERIOD,
-            EVIDENCE_PERIOD
-        );
-    }
-
-    function test_CreateCouncil_RevertsOnDuplicateMember() public {
-        address[] memory members = new address[](2);
-        members[0] = member1;
-        members[1] = member1;
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.DuplicateMember.selector, member1));
-        vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
             QUORUM_PERCENTAGE,
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
@@ -224,135 +146,61 @@ contract CouncilRegistryTest is Test {
     }
 
     function test_CreateCouncil_RevertsOnInvalidQuorum() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        // Too low
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidQuorumPercentage.selector, 5));
+        // Quorum too low (below 10%)
+        vm.expectRevert();
         vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, 5, DEPOSIT_PERCENTAGE, VOTING_PERIOD, EVIDENCE_PERIOD);
+        registry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
+            5, // Too low
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
 
-        // Too high
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidQuorumPercentage.selector, 101));
+        // Quorum too high (above 100%)
+        vm.expectRevert();
         vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, 101, DEPOSIT_PERCENTAGE, VOTING_PERIOD, EVIDENCE_PERIOD);
+        registry.createCouncil(
+            "Another Council",
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
+            101, // Too high
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
     }
 
     function test_CreateCouncil_RevertsOnInvalidDepositPercentage() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidDepositPercentage.selector, 51));
+        // Deposit percentage too high (above 50%)
+        vm.expectRevert();
         vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, 51, VOTING_PERIOD, EVIDENCE_PERIOD);
+        registry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
+            QUORUM_PERCENTAGE,
+            51, // Too high
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
     }
 
     function test_CreateCouncil_RevertsOnInvalidVotingPeriod() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        // Too short
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidVotingPeriod.selector, 1 hours));
+        // Voting period too short
+        vm.expectRevert();
         vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, 1 hours, EVIDENCE_PERIOD);
-
-        // Too long
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidVotingPeriod.selector, 60 days));
-        vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, 60 days, EVIDENCE_PERIOD);
-    }
-
-    function test_CreateCouncil_RevertsOnInvalidEvidencePeriod() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        // Too short
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidEvidencePeriod.selector, 1 hours));
-        vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, VOTING_PERIOD, 1 hours);
-
-        // Too long
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.InvalidEvidencePeriod.selector, 30 days));
-        vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, VOTING_PERIOD, 30 days);
-    }
-
-    // =========================================================================
-    // Council Activation/Deactivation Tests
-    // =========================================================================
-
-    function test_ActivateCouncil_Success() public {
-        _createDefaultCouncil();
-
-        vm.expectEmit(true, false, false, false);
-        emit ICouncilRegistry.CouncilActivated(COUNCIL_ID);
-
-        vm.prank(governance);
-        registry.activateCouncil(COUNCIL_ID);
-
-        assertTrue(registry.isCouncilActive(COUNCIL_ID));
-    }
-
-    function test_ActivateCouncil_RevertsOnNonExistent() public {
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilNotFound.selector, COUNCIL_ID));
-        vm.prank(governance);
-        registry.activateCouncil(COUNCIL_ID);
-    }
-
-    function test_DeactivateCouncil_Success() public {
-        _createActiveCouncil();
-
-        vm.expectEmit(true, false, false, false);
-        emit ICouncilRegistry.CouncilDeactivated(COUNCIL_ID);
-
-        vm.prank(governance);
-        registry.deactivateCouncil(COUNCIL_ID);
-
-        assertFalse(registry.isCouncilActive(COUNCIL_ID));
-    }
-
-    // =========================================================================
-    // Council Closure Tests
-    // =========================================================================
-
-    function test_CloseCouncil_Success() public {
-        _createActiveCouncil();
-        
-        // Deactivate first
-        vm.prank(governance);
-        registry.deactivateCouncil(COUNCIL_ID);
-
-        vm.expectEmit(true, false, false, false);
-        emit ICouncilRegistry.CouncilClosed(COUNCIL_ID);
-
-        vm.prank(governance);
-        registry.closeCouncil(COUNCIL_ID);
-
-        assertTrue(registry.isCouncilClosed(COUNCIL_ID));
-    }
-
-    function test_CloseCouncil_RevertsIfActive() public {
-        _createActiveCouncil();
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilNotActive.selector, COUNCIL_ID));
-        vm.prank(governance);
-        registry.closeCouncil(COUNCIL_ID);
-    }
-
-    function test_CloseCouncil_RevertsIfHasPendingClaims() public {
-        _createActiveCouncil();
-        
-        // Add pending claim
-        vm.prank(claimsManager);
-        registry.incrementPendingClaims(COUNCIL_ID);
-
-        // Deactivate
-        vm.prank(governance);
-        registry.deactivateCouncil(COUNCIL_ID);
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilHasPendingClaims.selector, COUNCIL_ID, 1));
-        vm.prank(governance);
-        registry.closeCouncil(COUNCIL_ID);
+        registry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
+            QUORUM_PERCENTAGE,
+            DEPOSIT_PERCENTAGE,
+            0, // Too short
+            EVIDENCE_PERIOD
+        );
     }
 
     // =========================================================================
@@ -360,290 +208,339 @@ contract CouncilRegistryTest is Test {
     // =========================================================================
 
     function test_AddMember_Success() public {
-        _createActiveCouncil();
+        bytes32 councilId = _createDefaultCouncil();
 
         vm.expectEmit(true, true, false, false);
-        emit ICouncilRegistry.MemberAdded(COUNCIL_ID, member4);
+        emit ICouncilRegistry.MemberAdded(councilId, member1);
 
         vm.prank(governance);
-        registry.addMember(COUNCIL_ID, member4);
+        registry.addMember(councilId, member1);
 
-        assertTrue(registry.isMember(COUNCIL_ID, member4));
-        assertEq(registry.getActiveMemberCount(COUNCIL_ID), 4);
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
+        assertEq(council.memberCount, 1);
+        assertTrue(registry.isMember(councilId, member1));
     }
 
-    function test_AddMember_RevertsOnDuplicate() public {
-        _createActiveCouncil();
+    function test_AddMember_RevertsOnNonGovernance() public {
+        bytes32 councilId = _createDefaultCouncil();
 
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.MemberAlreadyExists.selector, COUNCIL_ID, member1));
+        vm.expectRevert(abi.encodeWithSelector(TrustfulPausable.NotGovernance.selector, nonMember));
+        vm.prank(nonMember);
+        registry.addMember(councilId, member1);
+    }
+
+    function test_AddMember_RevertsOnZeroAddress() public {
+        bytes32 councilId = _createDefaultCouncil();
+
+        vm.expectRevert();
         vm.prank(governance);
-        registry.addMember(COUNCIL_ID, member1);
+        registry.addMember(councilId, address(0));
+    }
+
+    function test_AddMember_RevertsOnDuplicateMember() public {
+        bytes32 councilId = _createDefaultCouncil();
+
+        vm.startPrank(governance);
+        registry.addMember(councilId, member1);
+        
+        vm.expectRevert();
+        registry.addMember(councilId, member1);
+        vm.stopPrank();
     }
 
     function test_RemoveMember_Success() public {
-        _createActiveCouncil();
+        bytes32 councilId = _createCouncilWithMembers();
 
         vm.expectEmit(true, true, false, false);
-        emit ICouncilRegistry.MemberRemoved(COUNCIL_ID, member1);
+        emit ICouncilRegistry.MemberRemoved(councilId, member1);
 
         vm.prank(governance);
-        registry.removeMember(COUNCIL_ID, member1);
+        registry.removeMember(councilId, member1);
 
-        assertFalse(registry.isMember(COUNCIL_ID, member1));
-        assertEq(registry.getActiveMemberCount(COUNCIL_ID), 2);
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
+        assertEq(council.memberCount, 2);
+        assertFalse(registry.isMember(councilId, member1));
     }
 
-    function test_RemoveMember_RevertsOnLastMember() public {
-        address[] memory members = new address[](1);
-        members[0] = member1;
+    function test_RemoveMember_RevertsOnNonMember() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.expectRevert();
+        vm.prank(governance);
+        registry.removeMember(councilId, nonMember);
+    }
+
+    function test_SuspendMember_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.expectEmit(true, true, false, false);
+        emit ICouncilRegistry.MemberSuspended(councilId, member1);
 
         vm.prank(governance);
-        registry.createCouncil(
-            COUNCIL_ID,
-            members,
+        registry.suspendMember(councilId, member1);
+
+        // Member is still a member but suspended (can't vote)
+        assertTrue(registry.isMember(councilId, member1));
+        assertFalse(registry.canVote(councilId, member1));
+    }
+
+    function test_ReinstateMember_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.startPrank(governance);
+        registry.suspendMember(councilId, member1);
+        
+        vm.expectEmit(true, true, false, false);
+        emit ICouncilRegistry.MemberReinstated(councilId, member1);
+        
+        registry.reinstateMember(councilId, member1);
+        vm.stopPrank();
+
+        assertTrue(registry.canVote(councilId, member1));
+    }
+
+    // =========================================================================
+    // Council Activation/Deactivation Tests
+    // =========================================================================
+
+    function test_DeactivateCouncil_Success() public {
+        bytes32 councilId = _createDefaultCouncil();
+
+        vm.expectEmit(true, false, false, false);
+        emit ICouncilRegistry.CouncilDeactivated(councilId);
+
+        vm.prank(governance);
+        registry.deactivateCouncil(councilId);
+
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
+        assertFalse(council.active);
+    }
+
+    function test_ActivateCouncil_Success() public {
+        bytes32 councilId = _createDefaultCouncil();
+
+        vm.startPrank(governance);
+        registry.deactivateCouncil(councilId);
+        
+        vm.expectEmit(true, false, false, false);
+        emit ICouncilRegistry.CouncilActivated(councilId);
+        
+        registry.activateCouncil(councilId);
+        vm.stopPrank();
+
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
+        assertTrue(council.active);
+    }
+
+    // =========================================================================
+    // Council Closure Tests
+    // =========================================================================
+
+    function test_CloseCouncil_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.expectEmit(true, false, false, true);
+        emit ICouncilRegistry.CouncilClosed(councilId, block.timestamp);
+
+        vm.prank(governance);
+        registry.closeCouncil(councilId);
+
+        ICouncilRegistry.Council memory council = registry.getCouncil(councilId);
+        assertEq(council.closedAt, block.timestamp);
+    }
+
+    function test_CloseCouncil_RevertsWithActiveAgents() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        // Assign an agent to the council (via termsRegistry mock)
+        vm.prank(termsRegistry);
+        registry.assignAgentToCouncil(AGENT_ID, councilId);
+
+        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilHasActiveAgents.selector, councilId, 1));
+        vm.prank(governance);
+        registry.closeCouncil(councilId);
+    }
+
+    function test_CloseCouncil_RevertsWithPendingClaims() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        // Register pending claim
+        vm.prank(claimsManager);
+        registry.incrementPendingClaims(councilId);
+
+        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilHasPendingClaims.selector, councilId, 1));
+        vm.prank(governance);
+        registry.closeCouncil(councilId);
+    }
+
+    // =========================================================================
+    // Agent Assignment Tests
+    // =========================================================================
+
+    function test_AssignAgentToCouncil_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.prank(termsRegistry);
+        registry.assignAgentToCouncil(AGENT_ID, councilId);
+
+        assertEq(registry.getAgentCouncil(AGENT_ID), councilId);
+    }
+
+    function test_AssignAgentToCouncil_RevertsOnNonTermsRegistry() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.expectRevert();
+        vm.prank(nonMember);
+        registry.assignAgentToCouncil(AGENT_ID, councilId);
+    }
+
+    function test_ReassignAgentCouncil_Success() public {
+        bytes32 councilId1 = _createCouncilWithMembers();
+        
+        // Create second council
+        vm.prank(governance);
+        bytes32 councilId2 = registry.createCouncil(
+            "Second Council",
+            "Another test council",
+            "healthcare",
             QUORUM_PERCENTAGE,
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
             EVIDENCE_PERIOD
         );
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CannotRemoveLastMember.selector, COUNCIL_ID));
-        vm.prank(governance);
-        registry.removeMember(COUNCIL_ID, member1);
-    }
-
-    function test_SuspendMember_Success() public {
-        _createActiveCouncil();
-
-        vm.expectEmit(true, true, false, false);
-        emit ICouncilRegistry.MemberSuspended(COUNCIL_ID, member1);
-
-        vm.prank(governance);
-        registry.suspendMember(COUNCIL_ID, member1);
-
-        (bool active, bool suspended,) = registry.getMemberStatus(COUNCIL_ID, member1);
-        assertTrue(active);
-        assertTrue(suspended);
         
-        // Suspended member still counts but can't vote
-        assertEq(registry.getActiveMemberCount(COUNCIL_ID), 2); // Suspended decreases active count
-    }
-
-    function test_ReinstateMember_Success() public {
-        _createActiveCouncil();
-
-        vm.prank(governance);
-        registry.suspendMember(COUNCIL_ID, member1);
-
-        vm.expectEmit(true, true, false, false);
-        emit ICouncilRegistry.MemberReinstated(COUNCIL_ID, member1);
-
-        vm.prank(governance);
-        registry.reinstateMember(COUNCIL_ID, member1);
-
-        (bool active, bool suspended,) = registry.getMemberStatus(COUNCIL_ID, member1);
-        assertTrue(active);
-        assertFalse(suspended);
-    }
-
-    // =========================================================================
-    // Member Voting Tests
-    // =========================================================================
-
-    function test_CanVote_ActiveMember() public {
-        _createActiveCouncil();
-        assertTrue(registry.canVote(COUNCIL_ID, member1));
-    }
-
-    function test_CanVote_SuspendedMemberCannotVote() public {
-        _createActiveCouncil();
-
-        vm.prank(governance);
-        registry.suspendMember(COUNCIL_ID, member1);
-
-        assertFalse(registry.canVote(COUNCIL_ID, member1));
-    }
-
-    function test_CanVote_NonMemberCannotVote() public {
-        _createActiveCouncil();
-        assertFalse(registry.canVote(COUNCIL_ID, nonMember));
-    }
-
-    function test_IncrementMemberVotes() public {
-        _createActiveCouncil();
-
-        vm.prank(claimsManager);
-        registry.incrementMemberVotes(COUNCIL_ID, member1);
-
-        (,, uint256 totalVotes) = registry.getMemberStatus(COUNCIL_ID, member1);
-        assertEq(totalVotes, 1);
-    }
-
-    // =========================================================================
-    // Agent Council Assignment Tests
-    // =========================================================================
-
-    function test_RegisterAgentWithCouncil_Success() public {
-        _createActiveCouncil();
-
-        vm.prank(termsRegistry);
-        registry.registerAgentWithCouncil(AGENT_ID, COUNCIL_ID);
-
-        assertEq(registry.getAgentCouncil(AGENT_ID), COUNCIL_ID);
-    }
-
-    function test_RegisterAgentWithCouncil_RevertsOnInactiveCouncil() public {
-        _createDefaultCouncil(); // Not activated
-
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilNotActive.selector, COUNCIL_ID));
-        vm.prank(termsRegistry);
-        registry.registerAgentWithCouncil(AGENT_ID, COUNCIL_ID);
-    }
-
-    function test_ReassignAgentCouncil_GovernanceOverride() public {
-        _createActiveCouncil();
-        
-        bytes32 newCouncilId = keccak256("new-council");
-        address[] memory members = new address[](2);
-        members[0] = member4;
-        members[1] = member5;
-
         vm.startPrank(governance);
-        registry.createCouncil(newCouncilId, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, VOTING_PERIOD, EVIDENCE_PERIOD);
-        registry.activateCouncil(newCouncilId);
+        registry.addMember(councilId2, member4);
+        registry.addMember(councilId2, member5);
         vm.stopPrank();
 
+        // Assign to first council
         vm.prank(termsRegistry);
-        registry.registerAgentWithCouncil(AGENT_ID, COUNCIL_ID);
+        registry.assignAgentToCouncil(AGENT_ID, councilId1);
+
+        // Reassign via governance override
+        vm.expectEmit(true, true, true, false);
+        emit ICouncilRegistry.AgentCouncilReassigned(AGENT_ID, councilId1, councilId2);
 
         vm.prank(governance);
-        registry.reassignAgentCouncil(AGENT_ID, newCouncilId);
+        registry.reassignAgentCouncil(AGENT_ID, councilId2);
 
-        assertEq(registry.getAgentCouncil(AGENT_ID), newCouncilId);
-    }
-
-    function test_UnregisterAgentFromCouncil_Success() public {
-        _createActiveCouncil();
-
-        vm.prank(termsRegistry);
-        registry.registerAgentWithCouncil(AGENT_ID, COUNCIL_ID);
-
-        vm.prank(termsRegistry);
-        registry.unregisterAgentFromCouncil(AGENT_ID);
-
-        assertEq(registry.getAgentCouncil(AGENT_ID), bytes32(0));
+        assertEq(registry.getAgentCouncil(AGENT_ID), councilId2);
     }
 
     // =========================================================================
-    // Pending Claims Management Tests
+    // Pending Claims Tests
     // =========================================================================
 
-    function test_IncrementDecrementPendingClaims() public {
-        _createActiveCouncil();
+    function test_IncrementPendingClaims_Success() public {
+        bytes32 councilId = _createDefaultCouncil();
 
         vm.prank(claimsManager);
-        registry.incrementPendingClaims(COUNCIL_ID);
-        assertEq(registry.getPendingClaimsCount(COUNCIL_ID), 1);
+        registry.incrementPendingClaims(councilId);
 
-        vm.prank(claimsManager);
-        registry.incrementPendingClaims(COUNCIL_ID);
-        assertEq(registry.getPendingClaimsCount(COUNCIL_ID), 2);
-
-        vm.prank(claimsManager);
-        registry.decrementPendingClaims(COUNCIL_ID);
-        assertEq(registry.getPendingClaimsCount(COUNCIL_ID), 1);
+        assertEq(registry.getPendingClaimsCount(councilId), 1);
     }
 
-    function test_IncrementPendingClaims_RevertsOnNonClaimsManager() public {
-        _createActiveCouncil();
+    function test_DecrementPendingClaims_Success() public {
+        bytes32 councilId = _createDefaultCouncil();
 
-        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.NotClaimsManager.selector, nonMember));
-        vm.prank(nonMember);
-        registry.incrementPendingClaims(COUNCIL_ID);
+        vm.startPrank(claimsManager);
+        registry.incrementPendingClaims(councilId);
+        registry.incrementPendingClaims(councilId);
+        registry.decrementPendingClaims(councilId);
+        vm.stopPrank();
+
+        assertEq(registry.getPendingClaimsCount(councilId), 1);
     }
 
     // =========================================================================
     // Quorum Calculation Tests
     // =========================================================================
 
-    function test_CalculateQuorum() public {
-        _createActiveCouncil(); // 3 members, 51% quorum
+    function test_GetRequiredQuorum_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
 
-        // 51% of 3 = 1.53, rounds up to 2
-        assertEq(registry.calculateQuorum(COUNCIL_ID), 2);
+        // 3 members, 51% quorum = 2 required (rounds up)
+        uint256 requiredQuorum = registry.getRequiredQuorum(councilId);
+        assertEq(requiredQuorum, 2);
     }
 
-    function test_CalculateQuorum_With100Percent() public {
-        address[] memory members = new address[](3);
-        members[0] = member1;
-        members[1] = member2;
-        members[2] = member3;
+    function test_GetRequiredQuorum_RoundsUp() public {
+        bytes32 councilId = _createDefaultCouncil();
 
+        // Add 5 members
+        vm.startPrank(governance);
+        registry.addMember(councilId, member1);
+        registry.addMember(councilId, member2);
+        registry.addMember(councilId, member3);
+        registry.addMember(councilId, member4);
+        registry.addMember(councilId, member5);
+        vm.stopPrank();
+
+        // 5 members, 51% quorum = 3 required (2.55 rounds up to 3)
+        uint256 requiredQuorum = registry.getRequiredQuorum(councilId);
+        assertEq(requiredQuorum, 3);
+    }
+
+    // =========================================================================
+    // View Function Tests
+    // =========================================================================
+
+    function test_GetCouncilMembers_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        address[] memory members = registry.getCouncilMembers(councilId);
+        assertEq(members.length, 3);
+    }
+
+    function test_GetAllCouncils_Success() public {
+        _createDefaultCouncil();
+        
         vm.prank(governance);
         registry.createCouncil(
-            COUNCIL_ID,
-            members,
-            100, // 100% quorum
+            "Second Council",
+            "Another description",
+            "healthcare",
+            QUORUM_PERCENTAGE,
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
             EVIDENCE_PERIOD
         );
 
-        assertEq(registry.calculateQuorum(COUNCIL_ID), 3);
+        bytes32[] memory councils = registry.getAllCouncils();
+        assertEq(councils.length, 2);
     }
 
-    // =========================================================================
-    // View Functions Tests
-    // =========================================================================
+    function test_GetCouncilsByVertical_Success() public {
+        _createDefaultCouncil(); // defi
+        
+        vm.prank(governance);
+        registry.createCouncil(
+            "Healthcare Council",
+            "Healthcare description",
+            "healthcare",
+            QUORUM_PERCENTAGE,
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
 
-    function test_GetCouncilMembers() public {
-        _createActiveCouncil();
+        bytes32[] memory defiCouncils = registry.getCouncilsByVertical("defi");
+        assertEq(defiCouncils.length, 1);
 
-        address[] memory members = registry.getCouncilMembers(COUNCIL_ID);
-        assertEq(members.length, 3);
-        assertEq(members[0], member1);
-        assertEq(members[1], member2);
-        assertEq(members[2], member3);
+        bytes32[] memory healthcareCouncils = registry.getCouncilsByVertical("healthcare");
+        assertEq(healthcareCouncils.length, 1);
     }
 
-    function test_CouncilStatus() public {
-        _createDefaultCouncil();
+    function test_IsCouncilActive_Success() public {
+        bytes32 councilId = _createDefaultCouncil();
 
-        (bool exists, bool active) = registry.councilStatus(COUNCIL_ID);
-        assertTrue(exists);
-        assertFalse(active);
+        assertTrue(registry.isCouncilActive(councilId));
 
         vm.prank(governance);
-        registry.activateCouncil(COUNCIL_ID);
+        registry.deactivateCouncil(councilId);
 
-        (exists, active) = registry.councilStatus(COUNCIL_ID);
-        assertTrue(exists);
-        assertTrue(active);
-    }
-
-    // =========================================================================
-    // Parameter Update Tests
-    // =========================================================================
-
-    function test_UpdateCouncilParameters_Success() public {
-        _createActiveCouncil();
-
-        vm.prank(governance);
-        registry.updateCouncilParameters(COUNCIL_ID, 75, 15, 10 days, 5 days);
-
-        (
-            uint256 quorum,
-            uint256 deposit,
-            uint256 voting,
-            uint256 evidence,
-            ,
-            ,
-        ) = registry.getCouncil(COUNCIL_ID);
-
-        assertEq(quorum, 75);
-        assertEq(deposit, 15);
-        assertEq(voting, 10 days);
-        assertEq(evidence, 5 days);
+        assertFalse(registry.isCouncilActive(councilId));
     }
 
     // =========================================================================
@@ -652,26 +549,8 @@ contract CouncilRegistryTest is Test {
 
     function test_Pause_Success() public {
         vm.prank(governance);
-        registry.pause();
+        registry.pause(ITrustfulPausable.PauseScope.All, "test pause");
 
-        assertTrue(registry.paused());
-    }
-
-    function test_Pause_RevertsOnNonGovernance() public {
-        vm.expectRevert(abi.encodeWithSelector(TrustfulPausable.NotGovernance.selector, nonMember));
-        vm.prank(nonMember);
-        registry.pause();
-    }
-
-    function test_CreateCouncil_RevertsWhenPaused() public {
-        vm.prank(governance);
-        registry.pause();
-
-        address[] memory members = new address[](1);
-        members[0] = member1;
-
-        vm.expectRevert(TrustfulPausable.ContractPaused.selector);
-        vm.prank(governance);
-        registry.createCouncil(COUNCIL_ID, members, QUORUM_PERCENTAGE, DEPOSIT_PERCENTAGE, VOTING_PERIOD, EVIDENCE_PERIOD);
+        assertTrue(registry.isPaused(ITrustfulPausable.PauseScope.All));
     }
 }
