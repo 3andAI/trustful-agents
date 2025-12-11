@@ -302,16 +302,16 @@ contract ClaimsManagerTest is Test {
         _skipToVotingPeriod();
 
         vm.expectEmit(true, true, false, true);
-        emit IClaimsManager.VoteCast(claimId, member1, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        emit IClaimsManager.VoteCast(claimId, member1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         // Verify vote record
-        (IClaimsManager.VoteType voteType, uint256 approvedAmount, bool hasVoted) = 
+        (IClaimsManager.Vote voteType, uint256 approvedAmount, bool hasVoted) = 
             claimsManager.getVote(claimId, member1);
         
-        assertEq(uint8(voteType), uint8(IClaimsManager.VoteType.Approve));
+        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Approve));
         assertEq(approvedAmount, CLAIM_AMOUNT);
         assertTrue(hasVoted);
     }
@@ -321,10 +321,10 @@ contract ClaimsManagerTest is Test {
         _skipToVotingPeriod();
 
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
 
-        (IClaimsManager.VoteType voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.VoteType.Reject));
+        (IClaimsManager.Vote voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Reject));
         assertTrue(hasVoted);
     }
 
@@ -333,10 +333,10 @@ contract ClaimsManagerTest is Test {
         _skipToVotingPeriod();
 
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Abstain, 0);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Abstain, 0);
 
-        (IClaimsManager.VoteType voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.VoteType.Abstain));
+        (IClaimsManager.Vote voteType,, bool hasVoted) = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Abstain));
         assertTrue(hasVoted);
     }
 
@@ -346,7 +346,7 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(IClaimsManager.VotingNotStarted.selector);
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
     }
 
     function test_CastVote_RevertsAfterVotingPeriod() public {
@@ -355,7 +355,7 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(IClaimsManager.VotingEnded.selector);
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
     }
 
     function test_CastVote_RevertsOnNonMember() public {
@@ -364,7 +364,7 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotCouncilMember.selector, nonMember, COUNCIL_ID));
         vm.prank(nonMember);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
     }
 
     function test_CastVote_RevertsOnApproveAmountExceedsClaim() public {
@@ -377,7 +377,7 @@ contract ClaimsManagerTest is Test {
             CLAIM_AMOUNT
         ));
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT + 1);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT + 1);
     }
 
     function test_ChangeVote_Success() public {
@@ -386,17 +386,17 @@ contract ClaimsManagerTest is Test {
 
         // Initial vote
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         // Change vote
         vm.expectEmit(true, true, false, true);
-        emit IClaimsManager.VoteChanged(claimId, member1, IClaimsManager.VoteType.Reject, 0);
+        emit IClaimsManager.VoteChanged(claimId, member1, IClaimsManager.Vote.Reject, 0);
 
         vm.prank(member1);
-        claimsManager.changeVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.changeVote(claimId, IClaimsManager.Vote.Reject, 0);
 
-        (IClaimsManager.VoteType voteType,,) = claimsManager.getVote(claimId, member1);
-        assertEq(uint8(voteType), uint8(IClaimsManager.VoteType.Reject));
+        (IClaimsManager.Vote voteType,,) = claimsManager.getVote(claimId, member1);
+        assertEq(uint8(voteType), uint8(IClaimsManager.Vote.Reject));
     }
 
     function test_ChangeVote_RevertsIfNotVoted() public {
@@ -405,7 +405,7 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotVoted.selector, member1));
         vm.prank(member1);
-        claimsManager.changeVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.changeVote(claimId, IClaimsManager.Vote.Reject, 0);
     }
 
     // =========================================================================
@@ -418,9 +418,9 @@ contract ClaimsManagerTest is Test {
 
         // All 3 members vote approve (quorum = 51% of 3 = 2)
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
         vm.prank(member2);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, 800e6); // Partial
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, 800e6); // Partial
 
         _skipToAfterVoting();
 
@@ -439,9 +439,9 @@ contract ClaimsManagerTest is Test {
 
         // 2 reject votes
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
         vm.prank(member2);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
 
         _skipToAfterVoting();
 
@@ -457,7 +457,7 @@ contract ClaimsManagerTest is Test {
 
         // Only 1 vote (quorum needs 2)
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         _skipToAfterVoting();
 
@@ -533,7 +533,7 @@ contract ClaimsManagerTest is Test {
 
         // Cast a vote
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         vm.expectRevert(IClaimsManager.VotingAlreadyStarted.selector);
         vm.prank(claimant);
@@ -553,15 +553,15 @@ contract ClaimsManagerTest is Test {
         // Approve claim 1
         _skipToVotingPeriod();
         vm.prank(member1);
-        claimsManager.castVote(claimId1, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
         vm.prank(member2);
-        claimsManager.castVote(claimId1, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId1, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
 
         // Reject claim 2
         vm.prank(member1);
-        claimsManager.castVote(claimId2, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0);
         vm.prank(member2);
-        claimsManager.castVote(claimId2, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId2, IClaimsManager.Vote.Reject, 0);
 
         // Leave claim 3 without quorum
 
@@ -683,9 +683,9 @@ contract ClaimsManagerTest is Test {
         _skipToVotingPeriod();
 
         vm.prank(member1);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Approve, CLAIM_AMOUNT);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT);
         vm.prank(member2);
-        claimsManager.castVote(claimId, IClaimsManager.VoteType.Reject, 0);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Reject, 0);
 
         address[] memory voters = claimsManager.getVoters(claimId);
         assertEq(voters.length, 2);
