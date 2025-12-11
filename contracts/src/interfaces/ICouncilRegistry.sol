@@ -83,7 +83,6 @@ interface ICouncilRegistry {
     error CouncilAlreadyClosed(bytes32 councilId);
     error CouncilHasActiveAgents(bytes32 councilId, uint256 agentCount);
     error CouncilHasPendingClaims(bytes32 councilId, uint256 claimCount);
-    error NotGovernance(address caller);
 
     // =========================================================================
     // Council Management (Governance)
@@ -355,10 +354,4 @@ interface ICouncilRegistry {
      * @return required Number of votes needed
      */
     function calculateQuorum(bytes32 councilId) external view returns (uint256 required);
-
-    /**
-     * @notice Get the governance address
-     * @return governance The governance multisig address
-     */
-    function governance() external view returns (address governance);
 }
