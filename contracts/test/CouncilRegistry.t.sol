@@ -353,9 +353,9 @@ contract CouncilRegistryTest is Test {
     function test_CloseCouncil_RevertsWithActiveAgents() public {
         bytes32 councilId = _createCouncilWithMembers();
 
-        // Assign an agent to the council (via termsRegistry mock)
+        // Register an agent with the council (via termsRegistry)
         vm.prank(termsRegistry);
-        registry.assignAgentToCouncil(AGENT_ID, councilId);
+        registry.registerAgentWithCouncil(councilId);
 
         vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.CouncilHasActiveAgents.selector, councilId, 1));
         vm.prank(governance);
@@ -378,21 +378,35 @@ contract CouncilRegistryTest is Test {
     // Agent Assignment Tests
     // =========================================================================
 
-    function test_AssignAgentToCouncil_Success() public {
+    function test_RegisterAgentWithCouncil_Success() public {
         bytes32 councilId = _createCouncilWithMembers();
 
         vm.prank(termsRegistry);
-        registry.assignAgentToCouncil(AGENT_ID, councilId);
+        registry.registerAgentWithCouncil(councilId);
 
-        assertEq(registry.getAgentCouncil(AGENT_ID), councilId);
+        assertEq(registry.getAgentCountByCouncil(councilId), 1);
     }
 
-    function test_AssignAgentToCouncil_RevertsOnNonTermsRegistry() public {
+    function test_RegisterAgentWithCouncil_RevertsOnNonTermsRegistry() public {
         bytes32 councilId = _createCouncilWithMembers();
 
         vm.expectRevert();
         vm.prank(nonMember);
-        registry.assignAgentToCouncil(AGENT_ID, councilId);
+        registry.registerAgentWithCouncil(councilId);
+    }
+
+    function test_UnregisterAgentFromCouncil_Success() public {
+        bytes32 councilId = _createCouncilWithMembers();
+
+        vm.startPrank(termsRegistry);
+        registry.registerAgentWithCouncil(councilId);
+        registry.registerAgentWithCouncil(councilId);
+        assertEq(registry.getAgentCountByCouncil(councilId), 2);
+        
+        registry.unregisterAgentFromCouncil(councilId);
+        vm.stopPrank();
+
+        assertEq(registry.getAgentCountByCouncil(councilId), 1);
     }
 
     function test_ReassignAgentCouncil_Success() public {
@@ -415,13 +429,9 @@ contract CouncilRegistryTest is Test {
         registry.addMember(councilId2, member5);
         vm.stopPrank();
 
-        // Assign to first council
-        vm.prank(termsRegistry);
-        registry.assignAgentToCouncil(AGENT_ID, councilId1);
-
-        // Reassign via governance override
+        // Reassign via governance override (no prior assignment needed)
         vm.expectEmit(true, true, true, false);
-        emit ICouncilRegistry.AgentCouncilReassigned(AGENT_ID, councilId1, councilId2);
+        emit ICouncilRegistry.AgentCouncilReassigned(AGENT_ID, bytes32(0), councilId2);
 
         vm.prank(governance);
         registry.reassignAgentCouncil(AGENT_ID, councilId2);
