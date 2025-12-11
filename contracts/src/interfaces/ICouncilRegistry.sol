@@ -288,6 +288,13 @@ interface ICouncilRegistry {
     function isCouncilClosed(bytes32 councilId) external view returns (bool isClosed);
 
     /**
+     * @notice Check if a council is active (exists, not deactivated, not closed)
+     * @param councilId The council identifier
+     * @return isActive True if council is active
+     */
+    function isCouncilActive(bytes32 councilId) external view returns (bool isActive);
+
+    /**
      * @notice Get all members of a council
      * @param councilId The council identifier
      * @return members Array of member addresses
