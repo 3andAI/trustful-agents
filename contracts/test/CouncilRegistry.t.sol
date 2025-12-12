@@ -449,7 +449,7 @@ contract CouncilRegistryTest is Test {
         vm.prank(claimsManager);
         registry.incrementPendingClaims(councilId);
 
-        assertEq(registry.getPendingClaimsCount(councilId), 1);
+        assertEq(registry.getPendingClaimCountByCouncil(councilId), 1);
     }
 
     function test_DecrementPendingClaims_Success() public {
@@ -461,7 +461,7 @@ contract CouncilRegistryTest is Test {
         registry.decrementPendingClaims(councilId);
         vm.stopPrank();
 
-        assertEq(registry.getPendingClaimsCount(councilId), 1);
+        assertEq(registry.getPendingClaimCountByCouncil(councilId), 1);
     }
 
     // =========================================================================
