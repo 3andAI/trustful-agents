@@ -267,6 +267,8 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
 
     /// @inheritdoc ICouncilRegistry
     function addMember(bytes32 councilId, address member) external onlyGovernance {
+        if (member == address(0)) revert MemberNotFound(councilId, member);
+        
         Council storage council = _councils[councilId];
         if (council.createdAt == 0) revert CouncilNotFound(councilId);
         if (council.closedAt != 0) revert CouncilAlreadyClosed(councilId);

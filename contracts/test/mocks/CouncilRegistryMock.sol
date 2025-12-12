@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "../../src/interfaces/ICouncilRegistry.sol";
+
 /**
  * @title CouncilRegistryMock
  * @notice Mock CouncilRegistry for testing
@@ -10,7 +12,7 @@ contract CouncilRegistryMock {
     // State
     // =========================================================================
 
-    struct Council {
+    struct CouncilData {
         uint256 quorumPercentage;
         uint256 depositPercentage;
         uint256 votingPeriod;
@@ -25,10 +27,11 @@ contract CouncilRegistryMock {
         uint256 totalVotes;
     }
 
-    mapping(bytes32 => Council) private _councils;
+    mapping(bytes32 => CouncilData) private _councils;
     mapping(bytes32 => address[]) private _councilMembers;
     mapping(bytes32 => mapping(address => Member)) private _members;
     mapping(bytes32 => uint256) private _pendingClaims;
+    mapping(uint256 => bytes32) private _agentCouncils; // agentId => councilId
 
     // =========================================================================
     // Setup Functions
@@ -52,7 +55,7 @@ contract CouncilRegistryMock {
         uint256 evidencePeriod,
         bool active
     ) external {
-        _councils[councilId] = Council({
+        _councils[councilId] = CouncilData({
             quorumPercentage: quorumPercentage,
             depositPercentage: depositPercentage,
             votingPeriod: votingPeriod,
@@ -99,6 +102,13 @@ contract CouncilRegistryMock {
         _councils[councilId].memberCount--;
     }
 
+    /**
+     * @notice Set agent's council
+     */
+    function setAgentCouncil(uint256 agentId, bytes32 councilId) external {
+        _agentCouncils[agentId] = councilId;
+    }
+
     // =========================================================================
     // View Functions (matches ICouncilRegistry interface)
     // =========================================================================
@@ -111,10 +121,56 @@ contract CouncilRegistryMock {
     }
 
     /**
+     * @notice Get council status (exists and active)
+     */
+    function councilStatus(bytes32 councilId) external view returns (bool exists, bool active) {
+        CouncilData storage c = _councils[councilId];
+        // Council exists if it has any non-default values (e.g., votingPeriod > 0 or memberCount > 0)
+        exists = c.votingPeriod > 0 || c.memberCount > 0 || c.active;
+        active = c.active;
+    }
+
+    /**
+     * @notice Get full council data
+     */
+    function getCouncil(bytes32 councilId) external view returns (ICouncilRegistry.Council memory council) {
+        CouncilData storage c = _councils[councilId];
+        council = ICouncilRegistry.Council({
+            councilId: councilId,
+            name: "Test Council",
+            description: "Mock council for testing",
+            vertical: "test",
+            memberCount: c.memberCount,
+            quorumPercentage: c.quorumPercentage,
+            claimDepositPercentage: c.depositPercentage,
+            votingPeriod: c.votingPeriod,
+            evidencePeriod: c.evidencePeriod,
+            active: c.active,
+            createdAt: 1,
+            closedAt: 0
+        });
+    }
+
+    /**
+     * @notice Get agent's assigned council
+     */
+    function getAgentCouncil(uint256 agentId) external view returns (bytes32) {
+        return _agentCouncils[agentId];
+    }
+
+    /**
      * @notice Check if an address is a member of a council
      */
     function isMember(bytes32 councilId, address member) external view returns (bool) {
         return _members[councilId][member].active;
+    }
+
+    /**
+     * @notice Check if an address is an active member (not suspended)
+     */
+    function isActiveMember(bytes32 councilId, address member) external view returns (bool) {
+        Member storage m = _members[councilId][member];
+        return m.active && !m.suspended;
     }
 
     /**
@@ -148,7 +204,7 @@ contract CouncilRegistryMock {
         uint256 votingPeriod,
         uint256 evidencePeriod
     ) {
-        Council storage c = _councils[councilId];
+        CouncilData storage c = _councils[councilId];
         return (c.quorumPercentage, c.depositPercentage, c.votingPeriod, c.evidencePeriod);
     }
 
@@ -156,8 +212,16 @@ contract CouncilRegistryMock {
      * @notice Calculate quorum
      */
     function calculateQuorum(bytes32 councilId) external view returns (uint256) {
-        Council storage c = _councils[councilId];
+        CouncilData storage c = _councils[councilId];
         return (c.memberCount * c.quorumPercentage + 99) / 100;
+    }
+
+    /**
+     * @notice Calculate required deposit for a claim
+     */
+    function calculateRequiredDeposit(bytes32 councilId, uint256 claimAmount) external view returns (uint256 deposit) {
+        CouncilData storage c = _councils[councilId];
+        deposit = (claimAmount * c.depositPercentage) / 100;
     }
 
     /**
