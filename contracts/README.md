@@ -60,22 +60,102 @@ forge fmt
 
 ### Deploy
 
+There are three deployment scripts available:
+
+| Script | Purpose |
+|--------|---------|
+| `DeployMVP.s.sol` | Deploy MVP only (CollateralVault, TermsRegistry, TrustfulValidator) |
+| `DeployPhase1.s.sol` | Deploy all 6 Phase 1 contracts fresh |
+| `UpgradeToPhase1.s.sol` | Upgrade existing MVP to Phase 1 (add 3 new contracts) |
+
+#### Environment Setup
+
+Create a `.env` file from the template:
+
 ```bash
-# Local (anvil)
+cp .env.example .env
+```
+
+Required variables:
+```bash
+DEPLOYER_PRIVATE_KEY=your_private_key
+RPC_URL=https://sepolia.base.org   # or your RPC endpoint
+```
+
+Optional variables:
+```bash
+USDC_ADDRESS=0x...                  # Use existing USDC (deploys mock if not set)
+ERC8004_REGISTRY_ADDRESS=0x...      # Use existing registry (deploys mock if not set)
+WITHDRAWAL_GRACE_PERIOD=604800      # 7 days in seconds (default)
+MIN_COLLATERAL_AMOUNT=100000000     # 100 USDC in 6 decimals (default)
+VALIDATION_BASE_URI=https://trustful.ai/v/
+```
+
+#### Option A: Fresh Phase 1 Deployment
+
+Deploy all 6 contracts from scratch:
+
+```bash
+source .env
+
+forge script script/DeployPhase1.s.sol:DeployPhase1 \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  --verify \
+  -vvvv
+```
+
+#### Option B: Upgrade MVP to Phase 1
+
+If you already have MVP contracts deployed (CollateralVault, TermsRegistry, TrustfulValidator), use the upgrade script to add CouncilRegistry, ClaimsManager, and RulingExecutor:
+
+```bash
+source .env
+
+# Set existing MVP addresses
+export USDC_ADDRESS=0x63d5a529eD8a8192E2201c0cea4469397efE30Ba
+export ERC8004_REGISTRY_ADDRESS=0xb3B4b5042Fd3600404846671Ff5558719860b694
+export COLLATERAL_VAULT_ADDRESS=0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4
+export TERMS_REGISTRY_ADDRESS=0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d
+export TRUSTFUL_VALIDATOR_ADDRESS=0xe75817D8aADA91968AD492d583602Ec10B2569a6
+
+forge script script/UpgradeToPhase1.s.sol:UpgradeToPhase1 \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  --verify \
+  -vvvv
+```
+
+#### Post-Deployment: Create Default Council
+
+After deploying Phase 1 contracts, create a default council for dispute resolution:
+
+```bash
+# Parameters: name, description, vertical, quorumPct, depositPct, votingPeriod, evidencePeriod
+cast send <COUNCIL_REGISTRY_ADDRESS> \
+  "createCouncil(string,string,string,uint256,uint256,uint256,uint256)" \
+  "General" "Default council for AI agent disputes" "general" \
+  5000 1000 604800 259200 \
+  --rpc-url $RPC_URL \
+  --private-key $DEPLOYER_PRIVATE_KEY
+```
+
+Parameters explained:
+- `quorumPercentage`: 5000 = 50%
+- `claimDepositPercentage`: 1000 = 10%
+- `votingPeriod`: 604800 = 7 days
+- `evidencePeriod`: 259200 = 3 days
+
+#### Local Testing
+
+```bash
+# Start local Anvil node
 anvil &
-forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 
-# Base Sepolia
-forge script script/Deploy.s.sol \
-  --rpc-url $RPC_URL_BASE_SEPOLIA \
-  --broadcast \
-  --verify
-
-# Base Mainnet
-forge script script/Deploy.s.sol \
-  --rpc-url $RPC_URL_BASE_MAINNET \
-  --broadcast \
-  --verify
+# Deploy to local
+forge script script/DeployPhase1.s.sol:DeployPhase1 \
+  --rpc-url http://localhost:8545 \
+  --broadcast
 ```
 
 ## Architecture
