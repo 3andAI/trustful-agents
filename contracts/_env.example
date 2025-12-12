@@ -9,6 +9,7 @@
 export DEPLOYER_PRIVATE_KEY=
 
 # RPC URLs
+export RPC_URL=https://sepolia.base.org
 export RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
 export RPC_URL_BASE_MAINNET=https://mainnet.base.org
 
@@ -37,3 +38,22 @@ export BASESCAN_API_KEY=
 
 # Base URI for validation responses
 # export VALIDATION_BASE_URI=https://trustful.ai/v/
+
+# =============================================================================
+# Upgrade Mode - For UpgradeToPhase1.s.sol
+# =============================================================================
+# Use these when upgrading an existing MVP deployment to Phase 1
+
+# Existing MVP contract addresses (required for upgrade)
+# export COLLATERAL_VAULT_ADDRESS=0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4
+# export TERMS_REGISTRY_ADDRESS=0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d
+# export TRUSTFUL_VALIDATOR_ADDRESS=0xe75817D8aADA91968AD492d583602Ec10B2569a6
+
+# =============================================================================
+# Base Sepolia Current Deployment (for reference)
+# =============================================================================
+# USDC (Mock): 0x63d5a529eD8a8192E2201c0cea4469397efE30Ba
+# ERC-8004 Registry (Mock): 0xb3B4b5042Fd3600404846671Ff5558719860b694
+# CollateralVault: 0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4
+# TermsRegistry: 0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d
+# TrustfulValidator: 0xe75817D8aADA91968AD492d583602Ec10B2569a6
