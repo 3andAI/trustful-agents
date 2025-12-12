@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import { ITermsRegistry } from "../../src/interfaces/ITermsRegistry.sol";
+
 /**
  * @title TermsRegistryMock
  * @notice Mock TermsRegistry for testing ClaimsManager
@@ -61,6 +63,24 @@ contract TermsRegistryMock {
      */
     function hasActiveTerms(uint256 agentId) external view returns (bool) {
         return _agentTerms[agentId].active;
+    }
+
+    /**
+     * @notice Get active terms for an agent (required by ClaimsManager)
+     */
+    function getActiveTerms(uint256 agentId) external view returns (
+        ITermsRegistry.TermsVersion memory terms,
+        uint256 version
+    ) {
+        AgentTerms storage t = _agentTerms[agentId];
+        terms = ITermsRegistry.TermsVersion({
+            contentHash: t.termsHash,
+            contentUri: "ipfs://test",
+            councilId: t.councilId,
+            registeredAt: block.timestamp,
+            active: t.active
+        });
+        version = t.version;
     }
 
     /**

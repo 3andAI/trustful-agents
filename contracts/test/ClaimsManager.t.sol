@@ -92,6 +92,9 @@ contract ClaimsManagerTest is Test {
         members[1] = member2;
         members[2] = member3;
         councilRegistry.setMembers(COUNCIL_ID, members);
+        
+        // Register agent with council
+        councilRegistry.setAgentCouncil(AGENT_ID, COUNCIL_ID);
 
         // Setup terms
         termsRegistry.setAgentTerms(

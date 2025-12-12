@@ -201,7 +201,7 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IRulingExecutor
-    function executeClaim(uint256 claimId) external {
+    function executeClaim(uint256 claimId) external whenNotPaused(PauseScope.Executions) {
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
 
         if (claim.status == IClaimsManager.ClaimStatus.Approved) {

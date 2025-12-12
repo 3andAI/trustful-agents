@@ -88,14 +88,20 @@ contract CollateralVaultMock {
     /**
      * @notice Slash collateral and transfer to recipient
      */
-    function slash(uint256 agentId, uint256 claimId, uint256 amount, address recipient) external returns (bool) {
+    function slash(uint256 agentId, uint256 claimId, address recipient, uint256 amount) external returns (bool) {
         slashCallCount++;
         
+        // Use claim lock if set, otherwise use deposit directly (for simpler testing)
         uint256 locked = _claimLocks[agentId][claimId];
+        if (locked == 0) {
+            locked = _deposits[agentId];
+        }
         if (amount > locked) amount = locked;
         
-        _claimLocks[agentId][claimId] -= amount;
-        _lockedAmounts[agentId] -= amount;
+        if (_claimLocks[agentId][claimId] > 0) {
+            _claimLocks[agentId][claimId] -= amount;
+            _lockedAmounts[agentId] -= amount;
+        }
         _deposits[agentId] -= amount;
         
         // Transfer USDC to recipient
