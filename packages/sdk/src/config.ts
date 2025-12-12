@@ -1,4 +1,5 @@
 import { type Address } from "viem";
+import type { DataProviderMode } from "./providers";
 
 export interface TrustfulConfig {
   chainId: number;
@@ -12,25 +13,36 @@ export interface TrustfulConfig {
     usdc: Address;
     erc8004Registry: Address;
   };
+  // Data source configuration
+  dataSource: {
+    mode: DataProviderMode;
+    rpcUrl?: string;
+    subgraphUrl?: string;
+  };
   validationApiUrl: string;
-  subgraphUrl: string;
 }
 
-// Base Sepolia (testnet)
+// Base Sepolia (testnet) - MVP contracts deployed
 export const BASE_SEPOLIA_CONFIG: TrustfulConfig = {
   chainId: 84532,
   contracts: {
-    collateralVault: "0x0000000000000000000000000000000000000000" as Address,
-    termsRegistry: "0x0000000000000000000000000000000000000000" as Address,
-    trustfulValidator: "0x0000000000000000000000000000000000000000" as Address,
+    // MVP contracts (deployed)
+    collateralVault: "0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4" as Address,
+    termsRegistry: "0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d" as Address,
+    trustfulValidator: "0xe75817D8aADA91968AD492d583602Ec10B2569a6" as Address,
+    // Phase 1 contracts (update after deployment)
     councilRegistry: "0x0000000000000000000000000000000000000000" as Address,
     claimsManager: "0x0000000000000000000000000000000000000000" as Address,
     rulingExecutor: "0x0000000000000000000000000000000000000000" as Address,
-    usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address, // Base Sepolia USDC
-    erc8004Registry: "0x0000000000000000000000000000000000000000" as Address,
+    // External dependencies (mocks on testnet)
+    usdc: "0x63d5a529eD8a8192E2201c0cea4469397efE30Ba" as Address,
+    erc8004Registry: "0xb3B4b5042Fd3600404846671Ff5558719860b694" as Address,
+  },
+  dataSource: {
+    mode: 'rpc',
+    rpcUrl: 'https://sepolia.base.org',
   },
   validationApiUrl: "https://api.trustful-agents.org/v1",
-  subgraphUrl: "https://api.studio.thegraph.com/query/.../trustful-agents/version/latest",
 };
 
 // Base Mainnet
@@ -46,8 +58,11 @@ export const BASE_MAINNET_CONFIG: TrustfulConfig = {
     usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address, // Base USDC
     erc8004Registry: "0x0000000000000000000000000000000000000000" as Address,
   },
+  dataSource: {
+    mode: 'subgraph',
+    subgraphUrl: 'https://api.studio.thegraph.com/query/YOUR_ID/trustful-agents/version/latest',
+  },
   validationApiUrl: "https://api.trustful-agents.org/v1",
-  subgraphUrl: "https://api.studio.thegraph.com/query/.../trustful-agents/version/latest",
 };
 
 export const DEFAULT_CONFIG = BASE_SEPOLIA_CONFIG;
