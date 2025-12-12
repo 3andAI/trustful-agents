@@ -123,12 +123,12 @@ contract UpgradeToPhase1 is Script {
         CollateralVault _vault = CollateralVault(collateralVault);
         _vault.setClaimsManager(claimsManager);
         _vault.setRulingExecutor(rulingExecutor);
-        console.log("  CollateralVault: setClaimsManager, setRulingExecutor ✓");
+        console.log("  CollateralVault: setClaimsManager, setRulingExecutor [OK]");
 
         // 2.2 TermsRegistry → CouncilRegistry
         TermsRegistry _terms = TermsRegistry(termsRegistry);
         _terms.setCouncilRegistry(councilRegistry);
-        console.log("  TermsRegistry: setCouncilRegistry ✓");
+        console.log("  TermsRegistry: setCouncilRegistry [OK]");
 
         console.log("");
 
@@ -141,20 +141,20 @@ contract UpgradeToPhase1 is Script {
         // 3.1 CouncilRegistry
         _council.setTermsRegistry(termsRegistry);
         _council.setClaimsManager(claimsManager);
-        console.log("  CouncilRegistry: setTermsRegistry, setClaimsManager ✓");
+        console.log("  CouncilRegistry: setTermsRegistry, setClaimsManager [OK]");
 
         // 3.2 ClaimsManager
         _claims.setCollateralVault(collateralVault);
         _claims.setTermsRegistry(termsRegistry);
         _claims.setCouncilRegistry(councilRegistry);
         _claims.setRulingExecutor(rulingExecutor);
-        console.log("  ClaimsManager: setCollateralVault, setTermsRegistry, setCouncilRegistry, setRulingExecutor ✓");
+        console.log("  ClaimsManager: setCollateralVault, setTermsRegistry, setCouncilRegistry, setRulingExecutor [OK]");
 
         // 3.3 RulingExecutor
         _executor.setClaimsManager(claimsManager);
         _executor.setCollateralVault(collateralVault);
         _executor.setCouncilRegistry(councilRegistry);
-        console.log("  RulingExecutor: setClaimsManager, setCollateralVault, setCouncilRegistry ✓");
+        console.log("  RulingExecutor: setClaimsManager, setCollateralVault, setCouncilRegistry [OK]");
 
         vm.stopBroadcast();
 
