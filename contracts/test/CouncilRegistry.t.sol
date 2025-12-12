@@ -31,12 +31,12 @@ contract CouncilRegistryTest is Test {
 
     uint256 public constant AGENT_ID = 1;
 
-    // Default council parameters
+    // Default council parameters (in basis points: 100 = 1%, 10000 = 100%)
     string public constant COUNCIL_NAME = "Test Council";
     string public constant COUNCIL_DESCRIPTION = "A test council for DeFi";
     string public constant COUNCIL_VERTICAL = "defi";
-    uint256 public constant QUORUM_PERCENTAGE = 51;
-    uint256 public constant DEPOSIT_PERCENTAGE = 10;
+    uint256 public constant QUORUM_PERCENTAGE = 5100;  // 51%
+    uint256 public constant DEPOSIT_PERCENTAGE = 1000; // 10%
     uint256 public constant VOTING_PERIOD = 7 days;
     uint256 public constant EVIDENCE_PERIOD = 3 days;
 
@@ -146,27 +146,27 @@ contract CouncilRegistryTest is Test {
     }
 
     function test_CreateCouncil_RevertsOnInvalidQuorum() public {
-        // Quorum too low (below 10%)
+        // Quorum too low (below 10% = 1000 basis points)
         vm.expectRevert();
         vm.prank(governance);
         registry.createCouncil(
             COUNCIL_NAME,
             COUNCIL_DESCRIPTION,
             COUNCIL_VERTICAL,
-            5, // Too low
+            500, // 5% - Too low
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
             EVIDENCE_PERIOD
         );
 
-        // Quorum too high (above 100%)
+        // Quorum too high (above 100% = 10000 basis points)
         vm.expectRevert();
         vm.prank(governance);
         registry.createCouncil(
             "Another Council",
             COUNCIL_DESCRIPTION,
             COUNCIL_VERTICAL,
-            101, // Too high
+            10100, // 101% - Too high
             DEPOSIT_PERCENTAGE,
             VOTING_PERIOD,
             EVIDENCE_PERIOD
@@ -174,7 +174,7 @@ contract CouncilRegistryTest is Test {
     }
 
     function test_CreateCouncil_RevertsOnInvalidDepositPercentage() public {
-        // Deposit percentage too high (above 50%)
+        // Deposit percentage too high (above 50% = 5000 basis points)
         vm.expectRevert();
         vm.prank(governance);
         registry.createCouncil(
@@ -182,7 +182,7 @@ contract CouncilRegistryTest is Test {
             COUNCIL_DESCRIPTION,
             COUNCIL_VERTICAL,
             QUORUM_PERCENTAGE,
-            51, // Too high
+            5100, // 51% - Too high
             VOTING_PERIOD,
             EVIDENCE_PERIOD
         );
@@ -472,7 +472,7 @@ contract CouncilRegistryTest is Test {
         bytes32 councilId = _createCouncilWithMembers();
 
         // 3 members, 51% quorum = 2 required (rounds up)
-        uint256 requiredQuorum = registry.getRequiredQuorum(councilId);
+        uint256 requiredQuorum = registry.calculateQuorum(councilId);
         assertEq(requiredQuorum, 2);
     }
 
@@ -489,7 +489,7 @@ contract CouncilRegistryTest is Test {
         vm.stopPrank();
 
         // 5 members, 51% quorum = 3 required (2.55 rounds up to 3)
-        uint256 requiredQuorum = registry.getRequiredQuorum(councilId);
+        uint256 requiredQuorum = registry.calculateQuorum(councilId);
         assertEq(requiredQuorum, 3);
     }
 
