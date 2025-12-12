@@ -504,7 +504,7 @@ contract CouncilRegistryTest is Test {
         assertEq(members.length, 3);
     }
 
-    function test_GetAllCouncils_Success() public {
+    function test_GetActiveCouncils_Success() public {
         _createDefaultCouncil();
         
         vm.prank(governance);
@@ -518,7 +518,7 @@ contract CouncilRegistryTest is Test {
             EVIDENCE_PERIOD
         );
 
-        bytes32[] memory councils = registry.getAllCouncils();
+        bytes32[] memory councils = registry.getActiveCouncils();
         assertEq(councils.length, 2);
     }
 
