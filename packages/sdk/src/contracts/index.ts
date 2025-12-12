@@ -182,6 +182,7 @@ export const CouncilRegistryAbi = [
         components: [
           { name: "councilId", type: "bytes32" },
           { name: "name", type: "string" },
+          { name: "description", type: "string" },
           { name: "vertical", type: "string" },
           { name: "memberCount", type: "uint256" },
           { name: "quorumPercentage", type: "uint256" },
@@ -190,6 +191,7 @@ export const CouncilRegistryAbi = [
           { name: "evidencePeriod", type: "uint256" },
           { name: "active", type: "bool" },
           { name: "createdAt", type: "uint256" },
+          { name: "closedAt", type: "uint256" },
         ],
       },
     ],
@@ -213,6 +215,33 @@ export const CouncilRegistryAbi = [
       { name: "claimAmount", type: "uint256" },
     ],
     outputs: [{ name: "deposit", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getCouncilMembers",
+    inputs: [{ name: "councilId", type: "bytes32" }],
+    outputs: [{ name: "members", type: "address[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getMember",
+    inputs: [
+      { name: "councilId", type: "bytes32" },
+      { name: "member", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "memberData",
+        type: "tuple",
+        components: [
+          { name: "joinedAt", type: "uint256" },
+          { name: "active", type: "bool" },
+          { name: "claimsVoted", type: "uint256" },
+        ],
+      },
+    ],
     stateMutability: "view",
   },
 ] as const;
@@ -309,6 +338,34 @@ export const ClaimsManagerAbi = [
       { name: "claimedAmount", type: "uint256" },
     ],
     outputs: [{ name: "deposit", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getClaimVoters",
+    inputs: [{ name: "claimId", type: "uint256" }],
+    outputs: [{ name: "voters", type: "address[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getVote",
+    inputs: [
+      { name: "claimId", type: "uint256" },
+      { name: "voter", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "vote",
+        type: "tuple",
+        components: [
+          { name: "vote", type: "uint8" },
+          { name: "approvedAmount", type: "uint256" },
+          { name: "reasoning", type: "string" },
+          { name: "votedAt", type: "uint256" },
+        ],
+      },
+    ],
     stateMutability: "view",
   },
 ] as const;
