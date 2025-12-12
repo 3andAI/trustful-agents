@@ -69,11 +69,11 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
     // Errors
     // =========================================================================
 
-    error CouncilAlreadyExists(bytes32 councilId);
     error InvalidQuorumPercentage(uint256 provided, uint256 min, uint256 max);
     error InvalidDepositPercentage(uint256 provided, uint256 max);
     error InvalidVotingPeriod(uint256 provided, uint256 min, uint256 max);
     error InvalidEvidencePeriod(uint256 provided, uint256 min, uint256 max);
+    error CouncilAlreadyExists(bytes32 councilId);
     error MemberAlreadyExists(bytes32 councilId, address member);
     error MemberNotFound(bytes32 councilId, address member);
     error MemberNotActive(bytes32 councilId, address member);

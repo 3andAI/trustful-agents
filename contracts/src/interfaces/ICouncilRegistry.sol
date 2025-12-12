@@ -80,7 +80,6 @@ interface ICouncilRegistry {
 
     error CouncilNotFound(bytes32 councilId);
     error CouncilNotActive(bytes32 councilId);
-    error CouncilAlreadyExists(bytes32 councilId);
     error CouncilAlreadyClosed(bytes32 councilId);
     error CouncilHasActiveAgents(bytes32 councilId, uint256 agentCount);
     error CouncilHasPendingClaims(bytes32 councilId, uint256 claimCount);
