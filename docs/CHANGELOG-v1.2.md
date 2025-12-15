@@ -1,8 +1,23 @@
 # Trustful Agents v1.2 Changelog
 
-## Release Date: 2025-12-09
+## Release Date: 2025-12-09 (Updated: 2025-12-15)
 
 This release incorporates architectural decisions made during user story validation to eliminate council bias, simplify on-chain storage, and add governance capabilities.
+
+---
+
+## Latest Updates (2025-12-15)
+
+### ICouncilRegistry
+- **ADDED** `AgentHasOpenClaims(uint256 agentId, uint256 pendingCount)` error
+- **CHANGED** `reassignAgentCouncil()` now reverts if agent has pending claims
+- **NOTE** Phase 2 will add "migration mode" to allow reassignment with open claims
+
+### IClaimsManager
+- **ADDED** `getPendingClaimCount(uint256 agentId)` - Returns count of pending claims for an agent
+
+### Documentation
+- **ADDED** `docs/ROADMAP.md` - Phase 2 features including migration mode
 
 ---
 
