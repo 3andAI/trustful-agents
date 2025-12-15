@@ -354,6 +354,15 @@ interface IClaimsManager {
     function getClaimStats(uint256 agentId) external view returns (ClaimStats memory stats);
 
     /**
+     * @notice Get count of pending (unresolved) claims for an agent
+     * @param agentId The ERC-8004 token ID
+     * @return count Number of pending claims
+     * @dev Used by CouncilRegistry to check if agent can be reassigned
+     * [v1.2] New function
+     */
+    function getPendingClaimCount(uint256 agentId) external view returns (uint256 count);
+
+    /**
      * @notice Calculate required deposit for a claim
      * @param agentId The ERC-8004 token ID
      * @param claimedAmount The amount to be claimed

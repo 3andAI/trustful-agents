@@ -83,6 +83,7 @@ interface ICouncilRegistry {
     error CouncilAlreadyClosed(bytes32 councilId);
     error CouncilHasActiveAgents(bytes32 councilId, uint256 agentCount);
     error CouncilHasPendingClaims(bytes32 councilId, uint256 claimCount);
+    error AgentHasOpenClaims(uint256 agentId, uint256 pendingCount);
 
     // =========================================================================
     // Council Management (Governance)
@@ -174,6 +175,7 @@ interface ICouncilRegistry {
      * @dev Only governance can call
      * @dev Overrides the council set in agent's T&C
      * @dev Used when provider selected wrong council or governance needs to redirect
+     * @dev Requires agent to have no pending claims (Phase 2 will add migration mode)
      * [v1.2] New function
      */
     function reassignAgentCouncil(uint256 agentId, bytes32 newCouncilId) external;
