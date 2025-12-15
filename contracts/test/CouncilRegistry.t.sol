@@ -429,6 +429,13 @@ contract CouncilRegistryTest is Test {
         registry.addMember(councilId2, member5);
         vm.stopPrank();
 
+        // Mock ClaimsManager to return 0 pending claims
+        vm.mockCall(
+            claimsManager,
+            abi.encodeWithSignature("getPendingClaimCount(uint256)", AGENT_ID),
+            abi.encode(uint256(0))
+        );
+
         // Reassign via governance override (no prior assignment needed)
         vm.expectEmit(true, true, true, false);
         emit ICouncilRegistry.AgentCouncilReassigned(AGENT_ID, bytes32(0), councilId2);
@@ -572,11 +579,18 @@ contract CouncilRegistryTest is Test {
             EVIDENCE_PERIOD
         );
 
+        // Mock ClaimsManager to return 0 pending claims initially (for first assignment)
+        vm.mockCall(
+            claimsManager,
+            abi.encodeWithSignature("getPendingClaimCount(uint256)", AGENT_ID),
+            abi.encode(uint256(0))
+        );
+
         // First, assign agent to council1
         vm.prank(governance);
         registry.reassignAgentCouncil(AGENT_ID, councilId1);
 
-        // Mock ClaimsManager to return pending claims > 0
+        // Now mock ClaimsManager to return pending claims > 0
         vm.mockCall(
             claimsManager,
             abi.encodeWithSignature("getPendingClaimCount(uint256)", AGENT_ID),
@@ -603,10 +617,6 @@ contract CouncilRegistryTest is Test {
             EVIDENCE_PERIOD
         );
 
-        // First, assign agent to council1
-        vm.prank(governance);
-        registry.reassignAgentCouncil(AGENT_ID, councilId1);
-
         // Mock ClaimsManager to return pending claims = 0
         vm.mockCall(
             claimsManager,
@@ -614,7 +624,11 @@ contract CouncilRegistryTest is Test {
             abi.encode(uint256(0))
         );
 
-        // Reassign - should succeed
+        // First, assign agent to council1
+        vm.prank(governance);
+        registry.reassignAgentCouncil(AGENT_ID, councilId1);
+
+        // Reassign to council2 - should succeed (still 0 pending)
         vm.prank(governance);
         registry.reassignAgentCouncil(AGENT_ID, councilId2);
 
