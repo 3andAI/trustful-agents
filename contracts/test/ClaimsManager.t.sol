@@ -556,6 +556,39 @@ contract ClaimsManagerTest is Test {
         assertEq(stats.pendingClaims, 0);
     }
 
+    function test_GetPendingClaimCount() public {
+        // Initially no pending claims
+        assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 0);
+
+        // File a claim
+        uint256 claimId = _fileDefaultClaim();
+        assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 1);
+
+        // File another claim
+        _approveUSDC(claimant, CLAIM_AMOUNT * 2);
+        vm.prank(claimant);
+        claimsManager.fileClaim(
+            AGENT_ID,
+            CLAIM_AMOUNT,
+            EVIDENCE_HASH,
+            "ipfs://evidence2",
+            PAYMENT_HASH
+        );
+        assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 2);
+
+        // Finalize first claim (approve)
+        _skipToVotingPeriod();
+        vm.prank(member1);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT, "");
+        vm.prank(member2);
+        claimsManager.castVote(claimId, IClaimsManager.Vote.Approve, CLAIM_AMOUNT, "");
+        _skipToAfterVoting();
+        claimsManager.finalizeClaim(claimId);
+
+        // Now only 1 pending
+        assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 1);
+    }
+
     // =========================================================================
     // Ruling Executor Integration Tests
     // =========================================================================

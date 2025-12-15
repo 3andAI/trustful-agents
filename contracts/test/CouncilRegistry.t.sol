@@ -555,6 +555,95 @@ contract CouncilRegistryTest is Test {
     }
 
     // =========================================================================
+    // Agent Reassignment with Pending Claims Tests
+    // =========================================================================
+
+    function test_ReassignAgentCouncil_RevertsWhenHasPendingClaims() public {
+        bytes32 councilId1 = _createDefaultCouncil();
+        
+        vm.prank(governance);
+        bytes32 councilId2 = registry.createCouncil(
+            "Second Council",
+            "Second council description",
+            "healthcare",
+            QUORUM_PERCENTAGE,
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
+
+        // First, assign agent to council1
+        vm.prank(governance);
+        registry.reassignAgentCouncil(AGENT_ID, councilId1);
+
+        // Mock ClaimsManager to return pending claims > 0
+        vm.mockCall(
+            claimsManager,
+            abi.encodeWithSignature("getPendingClaimCount(uint256)", AGENT_ID),
+            abi.encode(uint256(1))
+        );
+
+        // Try to reassign - should revert
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(ICouncilRegistry.AgentHasOpenClaims.selector, AGENT_ID, 1));
+        registry.reassignAgentCouncil(AGENT_ID, councilId2);
+    }
+
+    function test_ReassignAgentCouncil_SucceedsWhenNoPendingClaims() public {
+        bytes32 councilId1 = _createDefaultCouncil();
+        
+        vm.prank(governance);
+        bytes32 councilId2 = registry.createCouncil(
+            "Second Council",
+            "Second council description",
+            "healthcare",
+            QUORUM_PERCENTAGE,
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
+
+        // First, assign agent to council1
+        vm.prank(governance);
+        registry.reassignAgentCouncil(AGENT_ID, councilId1);
+
+        // Mock ClaimsManager to return pending claims = 0
+        vm.mockCall(
+            claimsManager,
+            abi.encodeWithSignature("getPendingClaimCount(uint256)", AGENT_ID),
+            abi.encode(uint256(0))
+        );
+
+        // Reassign - should succeed
+        vm.prank(governance);
+        registry.reassignAgentCouncil(AGENT_ID, councilId2);
+
+        assertEq(registry.getAgentCouncil(AGENT_ID), councilId2);
+    }
+
+    function test_ReassignAgentCouncil_SucceedsWhenClaimsManagerNotSet() public {
+        // Deploy a fresh registry without claimsManager
+        CouncilRegistry freshRegistry = new CouncilRegistry(governance);
+        
+        vm.prank(governance);
+        bytes32 councilId = freshRegistry.createCouncil(
+            COUNCIL_NAME,
+            COUNCIL_DESCRIPTION,
+            COUNCIL_VERTICAL,
+            QUORUM_PERCENTAGE,
+            DEPOSIT_PERCENTAGE,
+            VOTING_PERIOD,
+            EVIDENCE_PERIOD
+        );
+
+        // Reassign without claimsManager set - should succeed (skips check)
+        vm.prank(governance);
+        freshRegistry.reassignAgentCouncil(AGENT_ID, councilId);
+
+        assertEq(freshRegistry.getAgentCouncil(AGENT_ID), councilId);
+    }
+
+    // =========================================================================
     // Pause Tests
     // =========================================================================
 
