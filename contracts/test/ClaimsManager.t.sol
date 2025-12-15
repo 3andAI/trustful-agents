@@ -564,15 +564,14 @@ contract ClaimsManagerTest is Test {
         uint256 claimId = _fileDefaultClaim();
         assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 1);
 
-        // File another claim
-        _approveUSDC(claimant, CLAIM_AMOUNT * 2);
+        // File another claim (claimant already has unlimited approval from setUp)
         vm.prank(claimant);
         claimsManager.fileClaim(
             AGENT_ID,
             CLAIM_AMOUNT,
             EVIDENCE_HASH,
             "ipfs://evidence2",
-            PAYMENT_HASH
+            PAYMENT_RECEIPT_HASH
         );
         assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 2);
 
