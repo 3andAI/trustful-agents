@@ -332,6 +332,13 @@ export const ClaimsManagerAbi = [
   },
   {
     type: "function",
+    name: "getPendingClaimCount",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "count", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "calculateRequiredDeposit",
     inputs: [
       { name: "agentId", type: "uint256" },
