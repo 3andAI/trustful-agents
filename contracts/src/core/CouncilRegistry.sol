@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { ICouncilRegistry } from "../interfaces/ICouncilRegistry.sol";
+import { IClaimsManager } from "../interfaces/IClaimsManager.sol";
 import { TrustfulPausable } from "../base/TrustfulPausable.sol";
 
 /**
@@ -247,6 +248,15 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         Council storage council = _councils[newCouncilId];
         if (council.createdAt == 0) revert CouncilNotFound(newCouncilId);
         if (!council.active) revert CouncilNotActive(newCouncilId);
+
+        // Check no pending claims for this agent
+        // Phase 2 will add "migration mode" to allow reassignment with open claims
+        if (claimsManager != address(0)) {
+            uint256 pendingCount = IClaimsManager(claimsManager).getPendingClaimCount(agentId);
+            if (pendingCount > 0) {
+                revert AgentHasOpenClaims(agentId, pendingCount);
+            }
+        }
 
         bytes32 oldCouncilId = _agentCouncilOverride[agentId];
 

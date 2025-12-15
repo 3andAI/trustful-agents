@@ -498,6 +498,11 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IClaimsManager
+    function getPendingClaimCount(uint256 agentId) external view returns (uint256) {
+        return _agentStats[agentId].pendingClaims;
+    }
+
+    /// @inheritdoc IClaimsManager
     function calculateRequiredDeposit(uint256 agentId, uint256 claimedAmount)
         external
         view
