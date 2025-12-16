@@ -3,7 +3,7 @@ import Safe from '@safe-global/protocol-kit';
 import {
   MetaTransactionData,
   OperationType,
-} from '@safe-global/safe-core-sdk-types';
+} from '@safe-global/types-kit';
 import { createPublicClient, http, type Address } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import type { SafeInfo, SafeTransactionResponse } from '../types/index.js';
@@ -16,12 +16,6 @@ const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS as Address;
 const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 
-// Safe Transaction Service URLs
-const SAFE_TX_SERVICE_URLS: Record<number, string> = {
-  8453: 'https://safe-transaction-base.safe.global',
-  84532: 'https://safe-transaction-base-sepolia.safe.global',
-};
-
 // ============================================================================
 // Clients
 // ============================================================================
@@ -30,14 +24,9 @@ let apiKit: SafeApiKit | null = null;
 
 function getApiKit(): SafeApiKit {
   if (!apiKit) {
-    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-    if (!txServiceUrl) {
-      throw new Error(`No Safe Transaction Service URL for chain ${CHAIN_ID}`);
-    }
-    
+    // SafeApiKit v4 uses chainId only (auto-detects tx service URL)
     apiKit = new SafeApiKit({
       chainId: BigInt(CHAIN_ID),
-      txServiceUrl,
     });
   }
   return apiKit;
@@ -142,9 +131,6 @@ export async function proposeTransaction(
   
   const kit = getApiKit();
   
-  // Get current nonce
-  const safeInfo = await getSafeInfo();
-  
   // Create transaction data
   const safeTransactionData: MetaTransactionData = {
     to,
@@ -156,7 +142,7 @@ export async function proposeTransaction(
   // If we have a private key, we can sign server-side
   // Otherwise, return unsigned transaction for client-side signing
   if (params.signerPrivateKey) {
-    // Initialize Safe with signer
+    // Initialize Safe with signer (protocol-kit v6)
     const protocolKit = await Safe.init({
       provider: RPC_URL,
       signer: params.signerPrivateKey,
@@ -174,13 +160,16 @@ export async function proposeTransaction(
     // Get transaction hash
     const safeTxHash = await protocolKit.getTransactionHash(signedTransaction);
     
+    // Get signature for the signer
+    const signerSignature = signedTransaction.getSignature(signerAddress.toLowerCase());
+    
     // Propose to Safe Transaction Service
     await kit.proposeTransaction({
       safeAddress: SAFE_ADDRESS,
       safeTransactionData: signedTransaction.data,
       safeTxHash,
       senderAddress: signerAddress,
-      senderSignature: signedTransaction.signatures.get(signerAddress.toLowerCase())?.data || '',
+      senderSignature: signerSignature?.data || '',
     });
     
     return safeTxHash;
@@ -222,7 +211,7 @@ export async function signTransaction(
     }],
   });
   
-  // Sign
+  // Sign the hash
   const signature = await protocolKit.signHash(safeTxHash);
   
   // Submit confirmation
