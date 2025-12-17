@@ -1,4 +1,4 @@
-import pg from 'pg';
+import pg, { QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,7 +9,7 @@ const { Pool } = pg;
 // Database Pool
 // ============================================================================
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 20,
@@ -28,7 +28,7 @@ export const db = pool;
 // Query Helpers
 // ============================================================================
 
-export async function query<T = unknown>(
+export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<pg.QueryResult<T>> {
@@ -43,7 +43,7 @@ export async function query<T = unknown>(
   return result;
 }
 
-export async function queryOne<T = unknown>(
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<T | null> {
@@ -51,7 +51,7 @@ export async function queryOne<T = unknown>(
   return result.rows[0] ?? null;
 }
 
-export async function queryMany<T = unknown>(
+export async function queryMany<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<T[]> {

@@ -8,11 +8,13 @@ import { db, healthCheck as dbHealthCheck, closePool } from './db/index.js';
 import { healthCheck as safeHealthCheck } from './services/safe.js';
 import { processEmailQueue } from './services/email.js';
 import { cleanupExpiredSessions } from './services/auth.js';
+import { expireOldProposals } from './services/proposals.js';
 
 import authRoutes from './routes/auth.js';
 import councilRoutes from './routes/councils.js';
 import safeRoutes from './routes/safe.js';
 import agentRoutes from './routes/agents.js';
+import proposalRoutes from './routes/proposals.js';
 
 // ============================================================================
 // Configuration
@@ -80,6 +82,7 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/councils', councilRoutes);
 app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
+app.use('/proposals', proposalRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -100,6 +103,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 let emailQueueInterval: NodeJS.Timeout | null = null;
 let sessionCleanupInterval: NodeJS.Timeout | null = null;
+let proposalExpirationInterval: NodeJS.Timeout | null = null;
 
 function startBackgroundTasks() {
   // Process email queue every 30 seconds
@@ -125,6 +129,18 @@ function startBackgroundTasks() {
       console.error('Session cleanup error:', error);
     }
   }, 5 * 60 * 1000);
+
+  // Expire old proposals every minute
+  proposalExpirationInterval = setInterval(async () => {
+    try {
+      const expired = await expireOldProposals();
+      if (expired > 0) {
+        console.log(`Expired ${expired} proposals`);
+      }
+    } catch (error) {
+      console.error('Proposal expiration error:', error);
+    }
+  }, 60 * 1000);
   
   console.log('Background tasks started');
 }
@@ -137,6 +153,10 @@ function stopBackgroundTasks() {
   if (sessionCleanupInterval) {
     clearInterval(sessionCleanupInterval);
     sessionCleanupInterval = null;
+  }
+  if (proposalExpirationInterval) {
+    clearInterval(proposalExpirationInterval);
+    proposalExpirationInterval = null;
   }
   console.log('Background tasks stopped');
 }
