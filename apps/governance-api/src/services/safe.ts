@@ -22,11 +22,22 @@ const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 
 let apiKit: SafeApiKit | null = null;
 
+// Safe Transaction Service URLs (without trailing slash)
+const SAFE_TX_SERVICE_URLS: Record<number, string> = {
+  8453: 'https://safe-transaction-base.safe.global',
+  84532: 'https://safe-transaction-base-sepolia.safe.global',
+};
+
 function getApiKit(): SafeApiKit {
   if (!apiKit) {
-    // SafeApiKit v4 uses chainId only (auto-detects tx service URL)
+    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+    if (!txServiceUrl) {
+      throw new Error(`No Safe Transaction Service URL for chain ${CHAIN_ID}`);
+    }
+    
     apiKit = new SafeApiKit({
       chainId: BigInt(CHAIN_ID),
+      txServiceUrl,
     });
   }
   return apiKit;
@@ -44,15 +55,42 @@ function getViemClient() {
 // Safe Info
 // ============================================================================
 
+interface SafeInfoResponse {
+  address: string;
+  nonce: string;
+  threshold: number;
+  owners: string[];
+  masterCopy: string;
+  modules: string[];
+  fallbackHandler: string;
+  guard: string;
+  version: string;
+}
+
 export async function getSafeInfo(): Promise<SafeInfo> {
-  const kit = getApiKit();
-  const info = await kit.getSafeInfo(SAFE_ADDRESS);
+  // Use direct fetch with redirect follow (SDK doesn't handle 308 redirects)
+  const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+  const url = `${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Safe API error: ${response.status} ${response.statusText}`);
+  }
+  
+  const info: SafeInfoResponse = await response.json();
   
   return {
-    address: SAFE_ADDRESS,
+    address: info.address,
     threshold: info.threshold,
     owners: info.owners,
-    nonce: info.nonce,
+    nonce: parseInt(info.nonce, 10),
   };
 }
 
@@ -71,10 +109,22 @@ export async function isSafeOwner(address: string): Promise<boolean> {
 // ============================================================================
 
 export async function getPendingTransactions(): Promise<SafeTransactionResponse[]> {
-  const kit = getApiKit();
-  const response = await kit.getPendingTransactions(SAFE_ADDRESS);
+  const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+  const url = `${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}/multisig-transactions/?executed=false&nonce__gte=0`;
   
-  return response.results.map((tx) => ({
+  const response = await fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    headers: { 'Accept': 'application/json' },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Safe API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  
+  return (data.results || []).map((tx: any) => ({
     safeTxHash: tx.safeTxHash,
     to: tx.to,
     data: tx.data || '0x',
@@ -91,8 +141,20 @@ export async function getPendingTransactions(): Promise<SafeTransactionResponse[
 
 export async function getTransaction(safeTxHash: string): Promise<SafeTransactionResponse | null> {
   try {
-    const kit = getApiKit();
-    const tx = await kit.getTransaction(safeTxHash);
+    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+    const url = `${txServiceUrl}/api/v1/multisig-transactions/${safeTxHash}/`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const tx = await response.json();
     
     return {
       safeTxHash: tx.safeTxHash,
