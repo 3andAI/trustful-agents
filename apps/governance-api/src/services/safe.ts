@@ -1,5 +1,5 @@
-import SafeApiKit from '@safe-global/api-kit';
-import Safe from '@safe-global/protocol-kit';
+import SafeApiKitModule from '@safe-global/api-kit';
+import SafeModule from '@safe-global/protocol-kit';
 import {
   MetaTransactionData,
   OperationType,
@@ -7,6 +7,31 @@ import {
 import { createPublicClient, http, type Address } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import type { SafeInfo, SafeTransactionResponse } from '../types/index.js';
+
+// Type workaround for default exports
+const SafeApiKit = SafeApiKitModule as unknown as new (config: { chainId: bigint; txServiceUrl: string }) => {
+  proposeTransaction(params: {
+    safeAddress: string;
+    safeTransactionData: any;
+    safeTxHash: string;
+    senderAddress: string;
+    senderSignature: string;
+  }): Promise<void>;
+  getTransaction(hash: string): Promise<any>;
+  confirmTransaction(hash: string, signature: string): Promise<void>;
+};
+
+const Safe = SafeModule as unknown as {
+  init(config: { provider: string; signer: string; safeAddress: string }): Promise<{
+    createTransaction(params: { transactions: MetaTransactionData[] }): Promise<any>;
+    signTransaction(tx: any): Promise<any>;
+    getTransactionHash(tx: any): Promise<string>;
+    signHash(hash: string): Promise<{ data: string }>;
+  }>;
+};
+
+// Type alias for SafeApiKit instance
+type SafeApiKitInstance = InstanceType<typeof SafeApiKit>;
 
 // ============================================================================
 // Configuration
@@ -20,7 +45,7 @@ const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 // Clients
 // ============================================================================
 
-let apiKit: SafeApiKit | null = null;
+let apiKit: SafeApiKitInstance | null = null;
 
 // Safe Transaction Service URLs (without trailing slash)
 const SAFE_TX_SERVICE_URLS: Record<number, string> = {
@@ -28,7 +53,7 @@ const SAFE_TX_SERVICE_URLS: Record<number, string> = {
   84532: 'https://safe-transaction-base-sepolia.safe.global',
 };
 
-function getApiKit(): SafeApiKit {
+function getApiKit(): SafeApiKitInstance {
   if (!apiKit) {
     const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
     if (!txServiceUrl) {
@@ -84,7 +109,7 @@ export async function getSafeInfo(): Promise<SafeInfo> {
     throw new Error(`Safe API error: ${response.status} ${response.statusText}`);
   }
   
-  const info: SafeInfoResponse = await response.json();
+  const info = await response.json() as SafeInfoResponse;
   
   return {
     address: info.address,
@@ -122,9 +147,9 @@ export async function getPendingTransactions(): Promise<SafeTransactionResponse[
     throw new Error(`Safe API error: ${response.status}`);
   }
   
-  const data = await response.json();
+  const data = await response.json() as { results?: unknown[] };
   
-  return (data.results || []).map((tx: any) => ({
+  return ((data.results || []) as any[]).map((tx) => ({
     safeTxHash: tx.safeTxHash,
     to: tx.to,
     data: tx.data || '0x',
@@ -154,7 +179,7 @@ export async function getTransaction(safeTxHash: string): Promise<SafeTransactio
       return null;
     }
     
-    const tx = await response.json();
+    const tx = await response.json() as any;
     
     return {
       safeTxHash: tx.safeTxHash,

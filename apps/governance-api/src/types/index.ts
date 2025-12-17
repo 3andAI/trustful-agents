@@ -85,6 +85,94 @@ export type EmailTemplate =
 export type EmailStatus = 'pending' | 'sent' | 'failed';
 
 // ============================================================================
+// Proposal Types
+// ============================================================================
+
+export type ProposalType = 'create_council' | 'delete_council' | 'add_member' | 'remove_member';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'executed';
+export type VoteChoice = 'aye' | 'nay' | 'abstain';
+
+export interface Proposal {
+  id: string;
+  type: ProposalType;
+  status: ProposalStatus;
+  council_name: string | null;
+  council_description: string | null;
+  council_vertical: string | null;
+  council_id: string | null;
+  member_address: string | null;
+  member_name: string | null;
+  member_description: string | null;
+  member_email: string | null;
+  proposer_address: string;
+  votes_aye: number;
+  votes_nay: number;
+  votes_abstain: number;
+  threshold: number;
+  expires_at: Date;
+  executed_at: Date | null;
+  safe_tx_hash: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Vote {
+  id: number;
+  proposal_id: string;
+  voter_address: string;
+  choice: VoteChoice;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ProposalResponse {
+  id: string;
+  type: ProposalType;
+  status: ProposalStatus;
+  councilName: string | null;
+  councilDescription: string | null;
+  councilVertical: string | null;
+  councilId: string | null;
+  memberAddress: string | null;
+  memberName: string | null;
+  proposerAddress: string;
+  votesAye: number;
+  votesNay: number;
+  votesAbstain: number;
+  threshold: number;
+  expiresAt: string;
+  createdAt: string;
+  myVote: VoteChoice | null;
+}
+
+export interface CreateCouncilProposalRequest {
+  name: string;
+  description: string;
+  vertical: string;
+}
+
+export interface DeleteCouncilProposalRequest {
+  councilId: string;
+}
+
+export interface AddMemberProposalRequest {
+  councilId: string;
+  address: string;
+  name?: string;
+  description?: string;
+  email?: string;
+}
+
+export interface RemoveMemberProposalRequest {
+  councilId: string;
+  address: string;
+}
+
+export interface VoteRequest {
+  choice: VoteChoice;
+}
+
+// ============================================================================
 // API Request/Response Types
 // ============================================================================
 
