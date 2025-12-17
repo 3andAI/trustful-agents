@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAccount, useConnect } from 'wagmi';
 import { Shield, Wallet, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { useWallet } from '../hooks/useWallet';
 import { useAuth } from '../hooks/useAuth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { isConnected, address } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
+  const { isConnected, address, isConnecting, connect } = useWallet();
   const { isAuthenticated, isLoading, error, login } = useAuth();
 
   // Redirect if already authenticated
@@ -17,10 +16,11 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleConnect = () => {
-    const injected = connectors.find((c) => c.id === 'injected');
-    if (injected) {
-      connect({ connector: injected });
+  const handleConnect = async () => {
+    try {
+      await connect();
+    } catch (err) {
+      console.error('Failed to connect:', err);
     }
   };
 
