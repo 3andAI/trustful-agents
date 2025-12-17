@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS governance_signers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_governance_signers_email ON governance_signers(email);
+CREATE INDEX IF NOT EXISTS idx_governance_signers_email ON governance_signers(email);
 
 -- ============================================================================
 -- Council Members (metadata for on-chain members)
@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS council_members (
     UNIQUE(address, council_id)
 );
 
-CREATE INDEX idx_council_members_council ON council_members(council_id);
-CREATE INDEX idx_council_members_address ON council_members(address);
-CREATE INDEX idx_council_members_email ON council_members(email);
+CREATE INDEX IF NOT EXISTS idx_council_members_council ON council_members(council_id);
+CREATE INDEX IF NOT EXISTS idx_council_members_address ON council_members(address);
+CREATE INDEX IF NOT EXISTS idx_council_members_email ON council_members(email);
 
 -- ============================================================================
 -- Sessions (SIWE authentication)
@@ -52,11 +52,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_sessions_address ON sessions(address);
-CREATE INDEX idx_sessions_expires ON sessions(expires_at);
-
--- Cleanup expired sessions periodically
-CREATE INDEX idx_sessions_cleanup ON sessions(expires_at) WHERE expires_at < NOW();
+CREATE INDEX IF NOT EXISTS idx_sessions_address ON sessions(address);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
 -- ============================================================================
 -- Audit Log
@@ -92,10 +89,10 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_log_action ON audit_log(action);
-CREATE INDEX idx_audit_log_actor ON audit_log(actor_address);
-CREATE INDEX idx_audit_log_target ON audit_log(target_type, target_id);
-CREATE INDEX idx_audit_log_created ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_address);
+CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
 
 -- ============================================================================
 -- Email Queue
@@ -129,8 +126,8 @@ CREATE TABLE IF NOT EXISTS email_queue (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_email_queue_status ON email_queue(status) WHERE status = 'pending';
-CREATE INDEX idx_email_queue_scheduled ON email_queue(scheduled_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_email_queue_status ON email_queue(status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_email_queue_scheduled ON email_queue(scheduled_at) WHERE status = 'pending';
 
 -- ============================================================================
 -- Helper Functions
