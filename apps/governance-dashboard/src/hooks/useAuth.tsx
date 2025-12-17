@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
-import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
 import { SiweMessage } from 'siwe';
+import { useWallet } from './useWallet';
 import {
   getNonce,
   login,
@@ -24,9 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected, chainId } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const { disconnect } = useDisconnect();
+  const { address, isConnected, chainId, signMessage, disconnect } = useWallet();
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const messageString = message.prepareMessage();
 
       // Sign the message
-      const signature = await signMessageAsync({ message: messageString });
+      const signature = await signMessage(messageString);
 
       // Send to server for verification
       const { token } = await login(messageString, signature);
@@ -109,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [address, chainId, signMessageAsync]);
+  }, [address, chainId, signMessage]);
 
   const handleLogout = useCallback(async () => {
     try {
