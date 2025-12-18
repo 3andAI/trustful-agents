@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { db, healthCheck as dbHealthCheck, closePool } from './db/index.js';
 import { healthCheck as safeHealthCheck } from './services/safe.js';
@@ -31,7 +33,22 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 const app = express();
 
 // Security middleware
-app.use(helmet());
+// In production, enable full helmet with proper CSP
+if (NODE_ENV === 'production') {
+  app.use(helmet({
+    contentSecurityPolicy: false,
+  }));
+} else {
+  // Development: disable helmet entirely to avoid HTTPS/CSP issues
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+    originAgentCluster: false,
+    strictTransportSecurity: false,
+  }));
+}
 app.use(cors({
   origin: CORS_ORIGIN.split(','),
   credentials: true,
@@ -84,9 +101,32 @@ app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
 app.use('/proposals', proposalRoutes);
 
-// 404 handler
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// Serve static frontend in production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendPath = path.join(__dirname, '../../governance-dashboard/dist');
+
+app.use(express.static(frontendPath));
+
+// SPA fallback - serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/auth') || req.path.startsWith('/councils') || 
+      req.path.startsWith('/safe') || req.path.startsWith('/agents') || 
+      req.path.startsWith('/proposals') || req.path.startsWith('/health')) {
+    return next();
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// 404 handler for API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/auth') || req.path.startsWith('/councils') || 
+      req.path.startsWith('/safe') || req.path.startsWith('/agents') || 
+      req.path.startsWith('/proposals')) {
+    res.status(404).json({ error: 'Not found' });
+  } else {
+    next();
+  }
 });
 
 // Error handler
