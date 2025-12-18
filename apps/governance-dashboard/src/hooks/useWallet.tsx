@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
-import { createWalletClient, custom, type WalletClient, type Address } from 'viem';
+import { createWalletClient, custom, getAddress, type WalletClient, type Address } from 'viem';
 import { baseSepolia } from 'viem/chains';
+
+// Helper to checksum address
+const toChecksumAddress = (addr: string): Address => getAddress(addr);
 
 interface WalletContextType {
   address: Address | null;
@@ -29,9 +32,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (typeof window === 'undefined' || !window.ethereum) return;
 
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as Address[];
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
         if (accounts.length > 0) {
-          setAddress(accounts[0]);
+          setAddress(toChecksumAddress(accounts[0]));
           const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' }) as string;
           setChainId(parseInt(chainIdHex, 16));
           
@@ -54,12 +57,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined' || !window.ethereum) return;
 
     const handleAccountsChanged = (accounts: unknown) => {
-      const addrs = accounts as Address[];
+      const addrs = accounts as string[];
       if (addrs.length === 0) {
         setAddress(null);
         setWalletClient(null);
       } else {
-        setAddress(addrs[0]);
+        setAddress(toChecksumAddress(addrs[0]));
       }
     };
 
@@ -85,10 +88,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const accounts = await window.ethereum.request({ 
         method: 'eth_requestAccounts' 
-      }) as Address[];
+      }) as string[];
       
       if (accounts.length > 0) {
-        setAddress(accounts[0]);
+        setAddress(toChecksumAddress(accounts[0]));
         
         const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' }) as string;
         setChainId(parseInt(chainIdHex, 16));
