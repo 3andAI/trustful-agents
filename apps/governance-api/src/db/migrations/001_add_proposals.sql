@@ -103,6 +103,18 @@ CREATE INDEX IF NOT EXISTS idx_votes_proposal ON votes(proposal_id);
 CREATE INDEX IF NOT EXISTS idx_votes_voter ON votes(voter_address);
 
 -- ============================================================================
+-- Helper Function (must be defined before triggers)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ============================================================================
 -- Triggers for updated_at
 -- ============================================================================
 
