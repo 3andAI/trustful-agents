@@ -10,13 +10,11 @@ import { db, healthCheck as dbHealthCheck, closePool } from './db/index.js';
 import { healthCheck as safeHealthCheck } from './services/safe.js';
 import { processEmailQueue } from './services/email.js';
 import { cleanupExpiredSessions } from './services/auth.js';
-import { expireOldProposals } from './services/proposals.js';
 
 import authRoutes from './routes/auth.js';
-import councilRoutes from './routes/councils.js';
+import councilRoutes from './routes/councils-v2.js';
 import safeRoutes from './routes/safe.js';
 import agentRoutes from './routes/agents.js';
-import proposalRoutes from './routes/proposals.js';
 
 // ============================================================================
 // Configuration
@@ -31,6 +29,9 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 // ============================================================================
 
 const app = express();
+
+// Trust Cloudflare proxy
+app.set('trust proxy', 1);
 
 // Security middleware
 // In production, enable full helmet with proper CSP
@@ -99,7 +100,6 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/councils', councilRoutes);
 app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
-app.use('/proposals', proposalRoutes);
 
 // Serve static frontend in production
 const __filename = fileURLToPath(import.meta.url);
@@ -112,7 +112,7 @@ app.use(express.static(frontendPath));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/auth') || req.path.startsWith('/councils') || 
       req.path.startsWith('/safe') || req.path.startsWith('/agents') || 
-      req.path.startsWith('/proposals') || req.path.startsWith('/health')) {
+      req.path.startsWith('/health')) {
     return next();
   }
   res.sendFile(path.join(frontendPath, 'index.html'));
@@ -121,8 +121,7 @@ app.get('*', (req, res, next) => {
 // 404 handler for API routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/auth') || req.path.startsWith('/councils') || 
-      req.path.startsWith('/safe') || req.path.startsWith('/agents') || 
-      req.path.startsWith('/proposals')) {
+      req.path.startsWith('/safe') || req.path.startsWith('/agents')) {
     res.status(404).json({ error: 'Not found' });
   } else {
     next();
@@ -143,7 +142,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 let emailQueueInterval: NodeJS.Timeout | null = null;
 let sessionCleanupInterval: NodeJS.Timeout | null = null;
-let proposalExpirationInterval: NodeJS.Timeout | null = null;
 
 function startBackgroundTasks() {
   // Process email queue every 30 seconds
@@ -169,18 +167,6 @@ function startBackgroundTasks() {
       console.error('Session cleanup error:', error);
     }
   }, 5 * 60 * 1000);
-
-  // Expire old proposals every minute
-  proposalExpirationInterval = setInterval(async () => {
-    try {
-      const expired = await expireOldProposals();
-      if (expired > 0) {
-        console.log(`Expired ${expired} proposals`);
-      }
-    } catch (error) {
-      console.error('Proposal expiration error:', error);
-    }
-  }, 60 * 1000);
   
   console.log('Background tasks started');
 }
@@ -193,10 +179,6 @@ function stopBackgroundTasks() {
   if (sessionCleanupInterval) {
     clearInterval(sessionCleanupInterval);
     sessionCleanupInterval = null;
-  }
-  if (proposalExpirationInterval) {
-    clearInterval(proposalExpirationInterval);
-    proposalExpirationInterval = null;
   }
   console.log('Background tasks stopped');
 }
