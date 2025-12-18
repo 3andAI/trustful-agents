@@ -1,21 +1,18 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
-  Users,
-  Vote,
+  Building2,
   LogOut,
   Shield,
   Menu,
+  ExternalLink,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { getPendingProposals } from '../lib/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/councils', label: 'Councils', icon: Users },
-  { path: '/proposals', label: 'Proposals', icon: Vote },
+  { path: '/councils', label: 'Councils', icon: Building2 },
 ];
 
 function shortenAddress(address: string): string {
@@ -26,15 +23,6 @@ export default function Layout() {
   const { profile, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Fetch pending proposals count for badge
-  const { data: pendingProposals } = useQuery({
-    queryKey: ['pendingProposals'],
-    queryFn: getPendingProposals,
-    refetchInterval: 30000,
-  });
-
-  const pendingCount = pendingProposals?.length || 0;
 
   return (
     <div className="min-h-screen flex">
@@ -75,7 +63,6 @@ export default function Layout() {
               const isActive = location.pathname === item.path ||
                 (item.path !== '/' && location.pathname.startsWith(item.path));
               const Icon = item.icon;
-              const showBadge = item.path === '/proposals' && pendingCount > 0;
 
               return (
                 <NavLink
@@ -92,14 +79,20 @@ export default function Layout() {
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
-                  {showBadge && (
-                    <span className="ml-auto bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                      {pendingCount}
-                    </span>
-                  )}
                 </NavLink>
               );
             })}
+
+            {/* Safe link */}
+            <a
+              href="https://app.safe.global"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-governance-400 hover:text-governance-100 hover:bg-governance-800/50"
+            >
+              <ExternalLink className="w-5 h-5" />
+              <span className="font-medium">Open Safe</span>
+            </a>
           </nav>
 
           {/* User section */}
