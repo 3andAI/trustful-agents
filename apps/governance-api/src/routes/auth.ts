@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { SiweMessage } from 'siwe';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validation.js';
@@ -73,8 +74,11 @@ router.post(
       // Create/update signer record
       await upsertGovernanceSigner(result.address);
       
+      // Extract nonce from SIWE message for session
+      const siweMessage = new SiweMessage(message);
+      
       // Create session
-      const session = await createSession(result.address, message);
+      const session = await createSession(result.address, siweMessage.nonce);
       
       res.json({
         token: session.id,
