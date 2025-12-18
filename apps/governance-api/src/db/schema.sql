@@ -199,20 +199,6 @@ CREATE TABLE IF NOT EXISTS votes (
 CREATE INDEX IF NOT EXISTS idx_votes_proposal ON votes(proposal_id);
 CREATE INDEX IF NOT EXISTS idx_votes_voter ON votes(voter_address);
 
--- Trigger for votes updated_at
-DROP TRIGGER IF EXISTS update_votes_updated_at ON votes;
-CREATE TRIGGER update_votes_updated_at
-    BEFORE UPDATE ON votes
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- Trigger for proposals updated_at
-DROP TRIGGER IF EXISTS update_proposals_updated_at ON proposals;
-CREATE TRIGGER update_proposals_updated_at
-    BEFORE UPDATE ON proposals
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
 -- ============================================================================
 -- Email Queue
 -- ============================================================================
@@ -279,6 +265,18 @@ CREATE TRIGGER update_governance_signers_updated_at
 DROP TRIGGER IF EXISTS update_council_members_updated_at ON council_members;
 CREATE TRIGGER update_council_members_updated_at
     BEFORE UPDATE ON council_members
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_votes_updated_at ON votes;
+CREATE TRIGGER update_votes_updated_at
+    BEFORE UPDATE ON votes
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_proposals_updated_at ON proposals;
+CREATE TRIGGER update_proposals_updated_at
+    BEFORE UPDATE ON proposals
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
