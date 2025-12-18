@@ -118,7 +118,7 @@ async function getSafeNonce(): Promise<number> {
     if (!response.ok) {
       throw new Error(`Failed to fetch Safe info: ${response.status}`);
     }
-    const data = await response.json();
+    const data = await response.json() as { nonce: number };
     return data.nonce;
   } catch (error) {
     console.error('Failed to get Safe nonce:', error);
@@ -282,7 +282,17 @@ export async function getPendingSafeTransactions(): Promise<{
       throw new Error(`Failed to fetch pending transactions: ${response.status}`);
     }
     
-    return await response.json();
+    return await response.json() as {
+      count: number;
+      results: Array<{
+        safeTxHash: string;
+        to: Address;
+        value: string;
+        data: Hex | null;
+        confirmations: Array<{ owner: Address }>;
+        confirmationsRequired: number;
+      }>;
+    };
   } catch (error) {
     console.error('Failed to get pending Safe transactions:', error);
     return { count: 0, results: [] };
@@ -307,7 +317,15 @@ export async function getSafeTransactionBySafeTxHash(safeTxHash: string): Promis
       return null;
     }
     
-    return await response.json();
+    return await response.json() as {
+      safeTxHash: string;
+      to: Address;
+      value: string;
+      data: Hex | null;
+      confirmations: Array<{ owner: Address }>;
+      confirmationsRequired: number;
+      isExecuted: boolean;
+    };
   } catch (error) {
     console.error('Failed to get Safe transaction:', error);
     return null;
