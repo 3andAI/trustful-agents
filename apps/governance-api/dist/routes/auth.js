@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { SiweMessage } from 'siwe';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validation.js';
 import { loginSchema, updateProfileSchema } from '../middleware/validation.js';
@@ -41,7 +42,17 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
             return;
         }
         // Check if user is a Safe owner (required for governance)
-        const isOwner = await isSafeOwner(result.address);
+        let isOwner = false;
+        try {
+            isOwner = await isSafeOwner(result.address);
+        }
+        catch (safeError) {
+            console.error('Safe owner check failed:', safeError);
+            res.status(503).json({
+                error: 'Unable to verify Safe ownership. Please try again later.',
+            });
+            return;
+        }
         if (!isOwner) {
             res.status(403).json({
                 error: 'Access denied. Only Safe multisig owners can access the governance dashboard.',
@@ -50,8 +61,10 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
         }
         // Create/update signer record
         await upsertGovernanceSigner(result.address);
+        // Extract nonce from SIWE message for session
+        const siweMessage = new SiweMessage(message);
         // Create session
-        const session = await createSession(result.address, message);
+        const session = await createSession(result.address, siweMessage.nonce);
         res.json({
             token: session.id,
             address: result.address,

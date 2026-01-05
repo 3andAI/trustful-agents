@@ -15,6 +15,7 @@ import authRoutes from './routes/auth.js';
 import councilRoutes from './routes/councils-v2.js';
 import safeRoutes from './routes/safe.js';
 import agentRoutes from './routes/agents.js';
+import pendingRoutes from './routes/pending.js';
 
 // ============================================================================
 // Configuration
@@ -100,6 +101,7 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/councils', councilRoutes);
 app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
+app.use('/pending', pendingRoutes);
 
 // Serve static frontend in production
 const __filename = fileURLToPath(import.meta.url);

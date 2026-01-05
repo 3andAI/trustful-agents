@@ -4,7 +4,7 @@ import {
   MetaTransactionData,
   OperationType,
 } from '@safe-global/types-kit';
-import { createPublicClient, http, type Address } from 'viem';
+import { createPublicClient, http, type Address, getAddress } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import type { SafeInfo, SafeTransactionResponse } from '../types/index.js';
 
@@ -42,10 +42,43 @@ const SAFE_ADDRESS = process.env.SAFE_ADDRESS as Address;
 const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 
 // ============================================================================
+// Safe Contract ABI (minimal for reading owners/threshold)
+// ============================================================================
+
+const SAFE_ABI = [
+  {
+    name: 'getOwners',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'address[]' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getThreshold',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'nonce',
+    type: 'function',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// ============================================================================
 // Clients
 // ============================================================================
 
 let apiKit: SafeApiKitInstance | null = null;
+
+// Cache for Safe info (avoids API rate limits)
+let cachedSafeInfo: SafeInfo | null = null;
+let cacheTime: number = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Safe Transaction Service URLs (without trailing slash)
 const SAFE_TX_SERVICE_URLS: Record<number, string> = {
@@ -77,46 +110,93 @@ function getViemClient() {
 }
 
 // ============================================================================
-// Safe Info
+// Safe Info - Read from Contract (no API calls)
 // ============================================================================
 
-interface SafeInfoResponse {
-  address: string;
-  nonce: string;
-  threshold: number;
-  owners: string[];
-  masterCopy: string;
-  modules: string[];
-  fallbackHandler: string;
-  guard: string;
-  version: string;
-}
-
 export async function getSafeInfo(): Promise<SafeInfo> {
-  // Use direct fetch with redirect follow (SDK doesn't handle 308 redirects)
-  const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-  const url = `${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}`;
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    redirect: 'follow',
-    headers: {
-      'Accept': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Safe API error: ${response.status} ${response.statusText}`);
+  // Return cached if valid
+  if (cachedSafeInfo && (Date.now() - cacheTime) < CACHE_TTL) {
+    return cachedSafeInfo;
   }
-  
-  const info = await response.json() as SafeInfoResponse;
-  
-  return {
-    address: info.address,
-    threshold: info.threshold,
-    owners: info.owners,
-    nonce: parseInt(info.nonce, 10),
-  };
+
+  // Validate SAFE_ADDRESS is configured
+  if (!SAFE_ADDRESS) {
+    throw new Error('SAFE_ADDRESS environment variable is not configured');
+  }
+
+  const client = getViemClient();
+
+  try {
+    // Read directly from Safe contract (no API rate limits)
+    const [owners, threshold, nonce] = await Promise.all([
+      client.readContract({
+        address: SAFE_ADDRESS,
+        abi: SAFE_ABI,
+        functionName: 'getOwners',
+      }),
+      client.readContract({
+        address: SAFE_ADDRESS,
+        abi: SAFE_ABI,
+        functionName: 'getThreshold',
+      }),
+      client.readContract({
+        address: SAFE_ADDRESS,
+        abi: SAFE_ABI,
+        functionName: 'nonce',
+      }),
+    ]);
+
+    const info: SafeInfo = {
+      address: getAddress(SAFE_ADDRESS),
+      threshold: Number(threshold),
+      owners: owners.map((o) => getAddress(o)),
+      nonce: Number(nonce),
+    };
+
+    // Cache the result
+    cachedSafeInfo = info;
+    cacheTime = Date.now();
+
+    return info;
+  } catch (rpcError) {
+    console.error('RPC call to Safe contract failed:', rpcError);
+    
+    // Fallback to Safe Transaction Service API
+    console.log('Falling back to Safe Transaction Service API...');
+    try {
+      const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+      const response = await fetch(`${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}/`, {
+        headers: { 'Accept': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Safe API returned ${response.status}`);
+      }
+      
+      const data = await response.json() as {
+        address: string;
+        threshold: number;
+        owners: string[];
+        nonce: number;
+      };
+      
+      const info: SafeInfo = {
+        address: getAddress(data.address),
+        threshold: data.threshold,
+        owners: data.owners.map((o) => getAddress(o)),
+        nonce: data.nonce,
+      };
+      
+      // Cache the result
+      cachedSafeInfo = info;
+      cacheTime = Date.now();
+      
+      return info;
+    } catch (apiError) {
+      console.error('Safe API fallback also failed:', apiError);
+      throw new Error(`Could not fetch Safe info: RPC and API both failed. RPC error: ${rpcError}`);
+    }
+  }
 }
 
 export async function getSafeOwners(): Promise<string[]> {

@@ -246,3 +246,55 @@ export async function updateMemberMetadata(
 export async function getSafeInfo(): Promise<SafeInfo> {
   return apiRequest('/safe/info');
 }
+
+// ============================================================================
+// Pending Transactions Endpoints
+// ============================================================================
+
+export interface PendingTransaction {
+  safeTxHash: string;
+  actionType: string;
+  title: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  proposedBy: string;
+  proposedAt: string;
+  status: string;
+  confirmations?: number;
+  confirmationsRequired?: number;
+}
+
+export async function getPendingTransactions(): Promise<{
+  transactions: PendingTransaction[];
+  safeThreshold: number;
+  safeOwners: number;
+}> {
+  return apiRequest('/pending');
+}
+
+export async function getPendingTransaction(
+  safeTxHash: string
+): Promise<PendingTransaction> {
+  return apiRequest(`/pending/${safeTxHash}`);
+}
+
+export async function storePendingTransaction(params: {
+  safeTxHash: string;
+  actionType: string;
+  title: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<{ success: boolean; safeTxHash: string }> {
+  return apiRequest('/pending', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function syncPendingTransactions(): Promise<{
+  success: boolean;
+  checked: number;
+  updated: number;
+}> {
+  return apiRequest('/pending/sync', { method: 'POST' });
+}

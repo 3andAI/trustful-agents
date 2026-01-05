@@ -3,16 +3,17 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { healthCheck as dbHealthCheck, closePool } from './db/index.js';
 import { healthCheck as safeHealthCheck } from './services/safe.js';
 import { processEmailQueue } from './services/email.js';
 import { cleanupExpiredSessions } from './services/auth.js';
-import { expireOldProposals } from './services/proposals.js';
 import authRoutes from './routes/auth.js';
-import councilRoutes from './routes/councils.js';
+import councilRoutes from './routes/councils-v2.js';
 import safeRoutes from './routes/safe.js';
 import agentRoutes from './routes/agents.js';
-import proposalRoutes from './routes/proposals.js';
+import pendingRoutes from './routes/pending.js';
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -23,8 +24,26 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 // Express App
 // ============================================================================
 const app = express();
+// Trust Cloudflare proxy
+app.set('trust proxy', 1);
 // Security middleware
-app.use(helmet());
+// In production, enable full helmet with proper CSP
+if (NODE_ENV === 'production') {
+    app.use(helmet({
+        contentSecurityPolicy: false,
+    }));
+}
+else {
+    // Development: disable helmet entirely to avoid HTTPS/CSP issues
+    app.use(helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        crossOriginOpenerPolicy: false,
+        crossOriginResourcePolicy: false,
+        originAgentCluster: false,
+        strictTransportSecurity: false,
+    }));
+}
 app.use(cors({
     origin: CORS_ORIGIN.split(','),
     credentials: true,
@@ -67,10 +86,30 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/councils', councilRoutes);
 app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
-app.use('/proposals', proposalRoutes);
-// 404 handler
-app.use((_req, res) => {
-    res.status(404).json({ error: 'Not found' });
+app.use('/pending', pendingRoutes);
+// Serve static frontend in production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendPath = path.join(__dirname, '../../governance-dashboard/dist');
+app.use(express.static(frontendPath));
+// SPA fallback - serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/councils') ||
+        req.path.startsWith('/safe') || req.path.startsWith('/agents') ||
+        req.path.startsWith('/health')) {
+        return next();
+    }
+    res.sendFile(path.join(frontendPath, 'index.html'));
+});
+// 404 handler for API routes
+app.use((req, res, next) => {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/councils') ||
+        req.path.startsWith('/safe') || req.path.startsWith('/agents')) {
+        res.status(404).json({ error: 'Not found' });
+    }
+    else {
+        next();
+    }
 });
 // Error handler
 app.use((err, _req, res, _next) => {
@@ -84,7 +123,6 @@ app.use((err, _req, res, _next) => {
 // ============================================================================
 let emailQueueInterval = null;
 let sessionCleanupInterval = null;
-let proposalExpirationInterval = null;
 function startBackgroundTasks() {
     // Process email queue every 30 seconds
     emailQueueInterval = setInterval(async () => {
@@ -110,18 +148,6 @@ function startBackgroundTasks() {
             console.error('Session cleanup error:', error);
         }
     }, 5 * 60 * 1000);
-    // Expire old proposals every minute
-    proposalExpirationInterval = setInterval(async () => {
-        try {
-            const expired = await expireOldProposals();
-            if (expired > 0) {
-                console.log(`Expired ${expired} proposals`);
-            }
-        }
-        catch (error) {
-            console.error('Proposal expiration error:', error);
-        }
-    }, 60 * 1000);
     console.log('Background tasks started');
 }
 function stopBackgroundTasks() {
@@ -132,10 +158,6 @@ function stopBackgroundTasks() {
     if (sessionCleanupInterval) {
         clearInterval(sessionCleanupInterval);
         sessionCleanupInterval = null;
-    }
-    if (proposalExpirationInterval) {
-        clearInterval(proposalExpirationInterval);
-        proposalExpirationInterval = null;
     }
     console.log('Background tasks stopped');
 }

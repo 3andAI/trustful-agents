@@ -14,9 +14,7 @@ const SAFE_TX_SERVICE_URL = CHAIN_ID === 8453
   ? 'https://safe-transaction-base.safe.global'
   : 'https://safe-transaction-base-sepolia.safe.global';
 
-const SAFE_APP_URL = CHAIN_ID === 8453
-  ? 'https://app.safe.global/home?safe=base:'
-  : 'https://app.safe.global/home?safe=basesep:';
+const SAFE_NETWORK_PREFIX = CHAIN_ID === 8453 ? 'base' : 'basesep';
 
 // ============================================================================
 // CouncilRegistry ABI (write functions for encoding)
@@ -247,15 +245,12 @@ export function generateRemoveMemberTxData(
 
 export function getSafeAppTransactionUrl(txData: { to: Address; data: Hex; value: string }): string {
   // Generate URL that opens Safe with pre-filled transaction
-  const baseUrl = `${SAFE_APP_URL}${SAFE_ADDRESS}`;
-  
-  // For new transaction, use the transaction builder or queue
-  // The Safe web app will handle the transaction creation
-  return `${baseUrl}/transactions/queue`;
+  // Correct format: https://app.safe.global/transactions/queue?safe=basesep:0x...
+  return `https://app.safe.global/transactions/queue?safe=${SAFE_NETWORK_PREFIX}:${SAFE_ADDRESS}`;
 }
 
 export function getSafeNewTransactionUrl(): string {
-  return `${SAFE_APP_URL}${SAFE_ADDRESS}/transactions/queue`;
+  return `https://app.safe.global/transactions/queue?safe=${SAFE_NETWORK_PREFIX}:${SAFE_ADDRESS}`;
 }
 
 // ============================================================================
@@ -336,4 +331,4 @@ export async function getSafeTransactionBySafeTxHash(safeTxHash: string): Promis
 // Exports
 // ============================================================================
 
-export { SAFE_ADDRESS, SAFE_TX_SERVICE_URL, SAFE_APP_URL, COUNCIL_REGISTRY_ADDRESS };
+export { SAFE_ADDRESS, SAFE_TX_SERVICE_URL, SAFE_NETWORK_PREFIX, COUNCIL_REGISTRY_ADDRESS };
