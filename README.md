@@ -1,96 +1,138 @@
-# GitHub Sync Update
+# Trustful Agents
 
-## Problem
+A decentralized trust layer for AI agents built on ERC-8004. Providers deposit collateral and commit to terms & conditions. Clients can file claims through on-chain council governance for dispute resolution.
 
-Your GitHub repository is in a **broken state** - it imports files that don't exist:
-
-1. `apps/governance-dashboard/src/App.tsx` imports `PendingVotesPage` → File missing
-2. `apps/governance-dashboard/src/pages/Councils.tsx` imports `useSafeTransaction` → File missing  
-3. `apps/governance-api/src/index.ts` imports `pendingRoutes` → File missing
-4. Database migration `003_pending_transactions.sql` → File missing
-
-## Files to Add
-
-Extract this zip to your repository root:
+## Architecture Overview
 
 ```
-apps/
-├── governance-api/
-│   └── src/
-│       ├── routes/
-│       │   └── pending.ts          ← NEW: Pending transactions API
-│       └── db/
-│           └── migrations/
-│               └── 003_pending_transactions.sql  ← NEW: DB migration
-└── governance-dashboard/
-    └── src/
-        ├── hooks/
-        │   └── useSafe.ts          ← NEW: Safe SDK integration hook
-        └── pages/
-            └── PendingVotes.tsx    ← NEW: Pending votes page
-
-docs/
-├── ARCHITECTURE-v1.3.md            ← NEW: Updated architecture doc
-└── API_REFERENCE.md                ← NEW: API documentation
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              SMART CONTRACTS                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  CORE                           DISPUTE RESOLUTION      ACCESS CONTROL      │
+│  ├── CollateralVault.sol        ├── CouncilRegistry     └── TrustfulPausable│
+│  ├── TermsRegistry.sol          ├── ClaimsManager                           │
+│  └── TrustfulValidator.sol      └── RulingExecutor                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                 ▼
+             ┌──────────┐      ┌──────────┐      ┌──────────┐
+             │ Subgraph │      │   API    │      │   SDK    │
+             │ (indexer)│      │ (validation)    │(TypeScript)
+             └──────────┘      └──────────┘      └──────────┘
+                    │                 │                 │
+                    └─────────────────┼─────────────────┘
+                                      ▼
+                    ┌─────────────────────────────────────┐
+                    │            APPLICATIONS             │
+                    ├──────────┬──────────┬──────────────┤
+                    │ Provider │  Client  │   Council    │
+                    │Dashboard │  Portal  │  Dashboard   │
+                    └──────────┴──────────┴──────────────┘
 ```
 
-## After Adding Files
+## Project Structure
 
-1. Run database migration:
+```
+trustful-agents/
+├── contracts/              # Solidity smart contracts (Foundry)
+├── subgraph/               # The Graph indexer
+├── api/                    # Validation response server
+├── packages/
+│   ├── sdk/                # TypeScript SDK
+│   └── shared/             # Shared types, ABIs, constants
+└── apps/
+    ├── provider-dashboard/ # Provider: manage agents, collateral, T&C
+    ├── client-portal/      # Client: discover agents, verify trust
+    ├── claims-portal/      # Claimant: file & track claims
+    └── council-dashboard/  # Council: review claims, vote
+```
+
+## Prerequisites
+
+- Node.js >= 18
+- pnpm >= 8
+- Foundry (forge, cast, anvil)
+
+> **New to development?** See [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md) for complete installation instructions for Windows and macOS.
+
+## Quick Start
+
+### 1. Install dependencies
+
 ```bash
-psql -d trustful_governance -f apps/governance-api/src/db/migrations/003_pending_transactions.sql
+pnpm install
 ```
 
-2. Rebuild backend:
+### 2. Build contracts
+
 ```bash
-cd apps/governance-api
-npm run build
-pm2 restart governance-api
+cd contracts
+forge build
 ```
 
-3. Rebuild frontend:
+### 3. Run tests
+
 ```bash
-cd apps/governance-dashboard
-npm run build
+cd contracts
+forge test
 ```
 
-4. Commit to GitHub:
+### 4. Start local node
+
 ```bash
-git add .
-git commit -m "Add missing files: pending transactions, Safe SDK integration, docs"
-git push
+cd contracts
+anvil
 ```
 
-## What These Files Do
+### 5. Deploy locally
 
-### pending.ts
-REST API endpoints for storing and retrieving transaction metadata:
-- `GET /pending` - List pending transactions with confirmation counts
-- `POST /pending` - Store transaction metadata after proposing
-- `POST /pending/sync` - Sync statuses with Safe Transaction Service
+```bash
+cd contracts
+forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+```
 
-### useSafe.ts
-React hook for Safe multisig integration:
-- Reads nonce from Safe contract (avoids API rate limits)
-- Signs transactions with MetaMask
-- Proposes directly to Safe Transaction Service
-- Stores metadata in our database
+## Configuration
 
-### PendingVotes.tsx
-Page showing pending governance transactions:
-- Human-readable descriptions of what each transaction does
-- Progress bars showing confirmation status
-- "Vote in Safe" buttons linking to Safe UI
+### Environment Variables
 
-### ARCHITECTURE-v1.3.md
-Updated architecture documentation reflecting:
-- Blockchain-first dashboard architecture
-- Safe SDK integration decisions
-- Pending transactions metadata system
-- Deployment architecture
+Copy `.env.example` to `.env` and configure:
 
-### API_REFERENCE.md
-Complete API documentation for developers:
-- All endpoints with request/response examples
-- Authentication flow
-- Error responses
+```bash
+# Network
+RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
+RPC_URL_BASE_MAINNET=https://mainnet.base.org
+
+# Deployment
+DEPLOYER_PRIVATE_KEY=0x...
+USDC_ADDRESS=0x...
+
+# API
+VALIDATION_API_URL=https://trustful-agents.org/v1
+IPFS_GATEWAY=https://ipfs.io/ipfs/
+
+# Subgraph
+SUBGRAPH_URL=https://api.thegraph.com/subgraphs/name/...
+```
+
+## Key Design Decisions
+
+| Topic | Decision |
+|-------|----------|
+| Chain | Base (L2 on Ethereum) |
+| Collateral Asset | USDC |
+| ERC-8004 Integration | Validation Registry pattern |
+| Council Governance | One-member-one-vote |
+| T&C Storage | On-chain hash, off-chain content (IPFS) |
+| Claim Deposits | Percentage of claimed amount (spam prevention) |
+
+## Version History
+
+| Version | Date | Description |
+|---------|------|-------------|
+| v1.1 | 2024-12-05 | Added claim deposits, payment binding, partial locking |
+| v1.0 | 2024-12-04 | Initial architecture |
+
+## License
+
+MIT
