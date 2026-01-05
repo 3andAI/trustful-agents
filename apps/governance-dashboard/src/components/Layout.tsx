@@ -6,13 +6,17 @@ import {
   Shield,
   Menu,
   ExternalLink,
+  Vote,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
+import { getPendingTransactions } from '../lib/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/councils', label: 'Councils', icon: Building2 },
+  { path: '/pending', label: 'Pending Votes', icon: Vote, showBadge: true },
 ];
 
 function shortenAddress(address: string): string {
@@ -23,6 +27,15 @@ export default function Layout() {
   const { profile, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Fetch pending count for badge
+  const { data: pendingData } = useQuery({
+    queryKey: ['pendingTransactions'],
+    queryFn: getPendingTransactions,
+    refetchInterval: 60000, // Check every minute
+  });
+
+  const pendingCount = pendingData?.transactions?.length ?? 0;
 
   return (
     <div className="min-h-screen flex">
@@ -63,6 +76,7 @@ export default function Layout() {
               const isActive = location.pathname === item.path ||
                 (item.path !== '/' && location.pathname.startsWith(item.path));
               const Icon = item.icon;
+              const showBadge = item.showBadge && pendingCount > 0;
 
               return (
                 <NavLink
@@ -79,6 +93,11 @@ export default function Layout() {
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
+                  {showBadge && (
+                    <span className="ml-auto bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {pendingCount}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}

@@ -5,6 +5,7 @@ import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
 import CouncilsPage from './pages/Councils';
 import CouncilDetailPage from './pages/CouncilDetail';
+import PendingVotesPage from './pages/PendingVotes';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,6 +41,7 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="councils" element={<CouncilsPage />} />
           <Route path="councils/:councilId" element={<CouncilDetailPage />} />
+          <Route path="pending" element={<PendingVotesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

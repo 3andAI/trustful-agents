@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle,
   User,
+  CheckCircle,
 } from 'lucide-react';
 import {
   getCouncil,
@@ -21,8 +22,10 @@ import {
   proposeAddMember,
   proposeRemoveMember,
   type CouncilMember,
-  type ProposeResponse,
 } from '../lib/api';
+import { useSafeTransaction } from '../hooks/useSafe';
+
+type ModalStep = 'form' | 'signing' | 'success' | 'error';
 
 export default function CouncilDetailPage() {
   const { councilId } = useParams<{ councilId: string }>();
@@ -30,7 +33,6 @@ export default function CouncilDetailPage() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<CouncilMember | null>(null);
-  const [txResult, setTxResult] = useState<ProposeResponse | null>(null);
 
   const { data: council, isLoading: councilLoading, error: councilError } = useQuery({
     queryKey: ['council', councilId],
@@ -181,10 +183,6 @@ export default function CouncilDetailPage() {
           councilId={councilId!}
           councilName={council.name}
           onClose={() => setShowAddMemberModal(false)}
-          onSuccess={(result) => {
-            setShowAddMemberModal(false);
-            setTxResult(result);
-          }}
         />
       )}
 
@@ -195,10 +193,6 @@ export default function CouncilDetailPage() {
           canClose={closeCheck?.canClose ?? false}
           closeReason={closeCheck?.reason ?? ''}
           onClose={() => setShowDeleteModal(false)}
-          onSuccess={(result) => {
-            setShowDeleteModal(false);
-            setTxResult(result);
-          }}
         />
       )}
 
@@ -208,15 +202,7 @@ export default function CouncilDetailPage() {
           councilName={council.name}
           member={memberToRemove}
           onClose={() => setMemberToRemove(null)}
-          onSuccess={(result) => {
-            setMemberToRemove(null);
-            setTxResult(result);
-          }}
         />
-      )}
-
-      {txResult && (
-        <TransactionResultModal result={txResult} onClose={() => setTxResult(null)} />
       )}
     </div>
   );
@@ -289,13 +275,15 @@ function AddMemberModal({
   councilId,
   councilName,
   onClose,
-  onSuccess,
 }: {
   councilId: string;
   councilName: string;
   onClose: () => void;
-  onSuccess: (result: ProposeResponse) => void;
 }) {
+  const [step, setStep] = useState<ModalStep>('form');
+  const [_safeTxHash, setSafeTxHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     memberAddress: '',
     name: '',
@@ -303,82 +291,156 @@ function AddMemberModal({
     description: '',
   });
 
-  const mutation = useMutation({
+  const { proposeTransaction, getSafeUrl, isProposing } = useSafeTransaction();
+
+  const getEncodedTx = useMutation({
     mutationFn: () => proposeAddMember(councilId, formData),
-    onSuccess: (data) => onSuccess(data),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate();
+    setStep('signing');
+    setErrorMessage(null);
+
+    try {
+      const txResponse = await getEncodedTx.mutateAsync();
+      
+      const result = await proposeTransaction(
+        {
+          to: txResponse.transaction.to,
+          data: txResponse.transaction.data,
+          value: txResponse.transaction.value,
+        },
+        {
+          actionType: 'add_member',
+          title: `Add Member to ${councilName}`,
+          description: formData.name 
+            ? `Add ${formData.name} (${formData.memberAddress.slice(0, 8)}...) to the council`
+            : `Add ${formData.memberAddress.slice(0, 8)}...${formData.memberAddress.slice(-6)} to the council`,
+          metadata: {
+            councilId,
+            councilName,
+            memberAddress: formData.memberAddress,
+            memberName: formData.name || null,
+          },
+        }
+      );
+
+      if (result.success && result.safeTxHash) {
+        setSafeTxHash(result.safeTxHash);
+        setStep('success');
+      } else {
+        setErrorMessage(result.error || 'Failed to propose transaction');
+        setStep('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create transaction');
+      setStep('error');
+    }
   };
+
+  const safeUrl = getSafeUrl();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="card p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-governance-100 mb-4">Add Member</h2>
-        <p className="text-sm text-governance-400 mb-4">Add a member to {councilName}</p>
+        
+        {step === 'form' && (
+          <>
+            <h2 className="text-xl font-bold text-governance-100 mb-4">Add Member</h2>
+            <p className="text-sm text-governance-400 mb-4">Add a member to {councilName}</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-governance-300 mb-1">
-              Address *
-            </label>
-            <input
-              type="text"
-              value={formData.memberAddress}
-              onChange={(e) => setFormData({ ...formData, memberAddress: e.target.value })}
-              className="input w-full font-mono"
-              placeholder="0x..."
-              pattern="^0x[a-fA-F0-9]{40}$"
-              required
-            />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-governance-300 mb-1">
+                  Address *
+                </label>
+                <input
+                  type="text"
+                  value={formData.memberAddress}
+                  onChange={(e) => setFormData({ ...formData, memberAddress: e.target.value })}
+                  className="input w-full font-mono"
+                  placeholder="0x..."
+                  pattern="^0x[a-fA-F0-9]{40}$"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-governance-300 mb-1">
+                  Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-governance-300 mb-1">
+                  Email (optional)
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" onClick={onClose} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary flex-1">
+                  Add & Sign
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {step === 'signing' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              {isProposing ? 'Proposing Transaction...' : 'Preparing...'}
+            </h2>
+            <p className="text-governance-400">
+              {isProposing ? 'Please sign in your wallet' : 'Encoding transaction...'}
+            </p>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-governance-300 mb-1">
-              Name (optional)
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-governance-300 mb-1">
-              Email (optional)
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="input w-full"
-            />
-          </div>
-
-          {mutation.error && (
-            <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger">
-              {(mutation.error as Error).message}
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Transaction Proposed!</h2>
+            <p className="text-governance-400 mb-6">
+              Other signers can now approve it in Safe.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                View in Safe <ExternalLink className="w-4 h-4" />
+              </a>
             </div>
-          )}
-
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Generate Transaction
-            </button>
           </div>
-        </form>
+        )}
+
+        {step === 'error' && (
+          <div className="text-center py-6">
+            <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Failed</h2>
+            <p className="text-governance-400 mb-4">{errorMessage}</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <button onClick={() => setStep('form')} className="btn-primary flex-1">Try Again</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -389,46 +451,118 @@ function RemoveMemberModal({
   councilName,
   member,
   onClose,
-  onSuccess,
 }: {
   councilId: string;
   councilName: string;
   member: CouncilMember;
   onClose: () => void;
-  onSuccess: (result: ProposeResponse) => void;
 }) {
-  const mutation = useMutation({
+  const [step, setStep] = useState<ModalStep>('form');
+  const [_safeTxHash, setSafeTxHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { proposeTransaction, getSafeUrl, isProposing } = useSafeTransaction();
+
+  const getEncodedTx = useMutation({
     mutationFn: () => proposeRemoveMember(councilId, member.address),
-    onSuccess: (data) => onSuccess(data),
   });
+
+  const handleSubmit = async () => {
+    setStep('signing');
+    setErrorMessage(null);
+
+    try {
+      const txResponse = await getEncodedTx.mutateAsync();
+      
+      const result = await proposeTransaction(
+        {
+          to: txResponse.transaction.to,
+          data: txResponse.transaction.data,
+          value: txResponse.transaction.value,
+        },
+        {
+          actionType: 'remove_member',
+          title: `Remove Member from ${councilName}`,
+          description: member.name 
+            ? `Remove ${member.name} (${member.address.slice(0, 8)}...) from the council`
+            : `Remove ${member.address.slice(0, 8)}...${member.address.slice(-6)} from the council`,
+          metadata: {
+            councilId,
+            councilName,
+            memberAddress: member.address,
+            memberName: member.name || null,
+          },
+        }
+      );
+
+      if (result.success && result.safeTxHash) {
+        setSafeTxHash(result.safeTxHash);
+        setStep('success');
+      } else {
+        setErrorMessage(result.error || 'Failed to propose transaction');
+        setStep('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create transaction');
+      setStep('error');
+    }
+  };
+
+  const safeUrl = getSafeUrl();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="card p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-governance-100 mb-4">Remove Member</h2>
-        <p className="text-governance-300 mb-4">
-          Are you sure you want to remove <strong>{member.name || member.address}</strong> from {councilName}?
-        </p>
+        
+        {step === 'form' && (
+          <>
+            <h2 className="text-xl font-bold text-governance-100 mb-4">Remove Member</h2>
+            <p className="text-governance-300 mb-4">
+              Remove <strong>{member.name || member.address}</strong> from {councilName}?
+            </p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={handleSubmit} className="btn-danger flex-1">Remove & Sign</button>
+            </div>
+          </>
+        )}
 
-        {mutation.error && (
-          <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger mb-4">
-            {(mutation.error as Error).message}
+        {step === 'signing' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              {isProposing ? 'Proposing...' : 'Preparing...'}
+            </h2>
+            <p className="text-governance-400">
+              {isProposing ? 'Please sign in your wallet' : 'Encoding transaction...'}
+            </p>
           </div>
         )}
 
-        <div className="flex gap-3">
-          <button onClick={onClose} className="btn-secondary flex-1">
-            Cancel
-          </button>
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="btn-danger flex-1 flex items-center justify-center gap-2"
-          >
-            {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            Generate Transaction
-          </button>
-        </div>
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Transaction Proposed!</h2>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                View in Safe <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div className="text-center py-6">
+            <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Failed</h2>
+            <p className="text-governance-400 mb-4">{errorMessage}</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <button onClick={() => setStep('form')} className="btn-primary flex-1">Try Again</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -440,129 +574,124 @@ function DeleteCouncilModal({
   canClose,
   closeReason,
   onClose,
-  onSuccess,
 }: {
   councilId: string;
   councilName: string;
   canClose: boolean;
   closeReason: string;
   onClose: () => void;
-  onSuccess: (result: ProposeResponse) => void;
 }) {
-  const mutation = useMutation({
+  const [step, setStep] = useState<ModalStep>('form');
+  const [_safeTxHash, setSafeTxHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { proposeTransaction, getSafeUrl, isProposing } = useSafeTransaction();
+
+  const getEncodedTx = useMutation({
     mutationFn: () => proposeCloseCouncil(councilId),
-    onSuccess: (data) => onSuccess(data),
   });
+
+  const handleSubmit = async () => {
+    setStep('signing');
+    setErrorMessage(null);
+
+    try {
+      const txResponse = await getEncodedTx.mutateAsync();
+      
+      const result = await proposeTransaction(
+        {
+          to: txResponse.transaction.to,
+          data: txResponse.transaction.data,
+          value: txResponse.transaction.value,
+        },
+        {
+          actionType: 'close_council',
+          title: `Close Council: ${councilName}`,
+          description: `Permanently close the ${councilName} council`,
+          metadata: {
+            councilId,
+            councilName,
+          },
+        }
+      );
+
+      if (result.success && result.safeTxHash) {
+        setSafeTxHash(result.safeTxHash);
+        setStep('success');
+      } else {
+        setErrorMessage(result.error || 'Failed to propose transaction');
+        setStep('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create transaction');
+      setStep('error');
+    }
+  };
+
+  const safeUrl = getSafeUrl();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="card p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-governance-100 mb-4">Close Council</h2>
         
-        {!canClose ? (
+        {step === 'form' && (
           <>
-            <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg mb-4">
-              <p className="text-warning text-sm">{closeReason || 'Council cannot be closed at this time.'}</p>
-            </div>
-            <button onClick={onClose} className="btn-secondary w-full">
-              Close
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="text-governance-300 mb-4">
-              Are you sure you want to close <strong>{councilName}</strong>? This action is permanent.
-            </p>
-
-            {mutation.error && (
-              <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger mb-4">
-                {(mutation.error as Error).message}
-              </div>
+            <h2 className="text-xl font-bold text-governance-100 mb-4">Close Council</h2>
+            
+            {!canClose ? (
+              <>
+                <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg mb-4">
+                  <p className="text-warning text-sm">{closeReason || 'Council cannot be closed.'}</p>
+                </div>
+                <button onClick={onClose} className="btn-secondary w-full">Close</button>
+              </>
+            ) : (
+              <>
+                <p className="text-governance-300 mb-4">
+                  Permanently close <strong>{councilName}</strong>? This cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleSubmit} className="btn-danger flex-1">Close & Sign</button>
+                </div>
+              </>
             )}
-
-            <div className="flex gap-3">
-              <button onClick={onClose} className="btn-secondary flex-1">
-                Cancel
-              </button>
-              <button
-                onClick={() => mutation.mutate()}
-                disabled={mutation.isPending}
-                className="btn-danger flex-1 flex items-center justify-center gap-2"
-              >
-                {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Generate Transaction
-              </button>
-            </div>
           </>
         )}
-      </div>
-    </div>
-  );
-}
 
-function TransactionResultModal({
-  result,
-  onClose,
-}: {
-  result: ProposeResponse;
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
+        {step === 'signing' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              {isProposing ? 'Proposing...' : 'Preparing...'}
+            </h2>
+          </div>
+        )}
 
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="card p-6 w-full max-w-lg">
-        <h2 className="text-xl font-bold text-governance-100 mb-4">Transaction Ready</h2>
-        <div className="space-y-4">
-          <p className="text-sm text-governance-300">{result.message}</p>
-
-          <div>
-            <label className="block text-sm font-medium text-governance-400 mb-1">To</label>
-            <div className="font-mono text-sm bg-governance-800 p-2 rounded break-all text-governance-200">
-              {result.transaction.to}
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Transaction Proposed!</h2>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                View in Safe <ExternalLink className="w-4 h-4" />
+              </a>
             </div>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-governance-400 mb-1">Data</label>
-            <div className="relative">
-              <div className="font-mono text-xs bg-governance-800 p-2 rounded break-all text-governance-200 max-h-32 overflow-y-auto">
-                {result.transaction.data}
-              </div>
-              <button
-                onClick={() => copyToClipboard(result.transaction.data)}
-                className="absolute top-2 right-2 p-1 hover:bg-governance-700 rounded"
-              >
-                {copied ? (
-                  <Check className="w-4 h-4 text-success" />
-                ) : (
-                  <Copy className="w-4 h-4 text-governance-400" />
-                )}
-              </button>
+        {step === 'error' && (
+          <div className="text-center py-6">
+            <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Failed</h2>
+            <p className="text-governance-400 mb-4">{errorMessage}</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <button onClick={() => setStep('form')} className="btn-primary flex-1">Try Again</button>
             </div>
           </div>
-
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="btn-secondary flex-1">
-              Close
-            </button>
-            <a
-              href={result.safeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              Open Safe
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

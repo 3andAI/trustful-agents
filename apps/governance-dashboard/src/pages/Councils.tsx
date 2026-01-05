@@ -7,13 +7,13 @@ import {
   Users,
   Activity,
   ExternalLink,
-  Copy,
-  Check,
   Loader2,
   AlertCircle,
   Search,
+  CheckCircle,
 } from 'lucide-react';
-import { getCouncils, proposeCreateCouncil, getSafeInfo, type Council, type ProposeResponse } from '../lib/api';
+import { getCouncils, proposeCreateCouncil, getSafeInfo, type Council } from '../lib/api';
+import { useSafeTransaction } from '../hooks/useSafe';
 
 // Vertical options
 const VERTICALS = [
@@ -27,7 +27,6 @@ const VERTICALS = [
 export default function CouncilsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [txResult, setTxResult] = useState<ProposeResponse | null>(null);
 
   const { data: councilsData, isLoading, error } = useQuery({
     queryKey: ['councils'],
@@ -140,24 +139,7 @@ export default function CouncilsPage() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateCouncilModal
-          onClose={() => {
-            setShowCreateModal(false);
-            setTxResult(null);
-          }}
-          onSuccess={(result) => {
-            setTxResult(result);
-          }}
-          txResult={txResult}
-        />
-      )}
-
-      {/* Transaction Result Modal */}
-      {txResult && !showCreateModal && (
-        <TransactionResultModal
-          result={txResult}
-          onClose={() => setTxResult(null)}
-        />
+        <CreateCouncilModal onClose={() => setShowCreateModal(false)} />
       )}
     </div>
   );
@@ -203,15 +185,13 @@ function CouncilCard({ council }: { council: Council }) {
   );
 }
 
-function CreateCouncilModal({
-  onClose,
-  onSuccess,
-  txResult,
-}: {
-  onClose: () => void;
-  onSuccess: (result: ProposeResponse) => void;
-  txResult: ProposeResponse | null;
-}) {
+type ModalStep = 'form' | 'signing' | 'success' | 'error';
+
+function CreateCouncilModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<ModalStep>('form');
+  const [safeTxHash, setSafeTxHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -221,30 +201,63 @@ function CreateCouncilModal({
     votingPeriodDays: 7,
     evidencePeriodDays: 3,
   });
-  const [copied, setCopied] = useState(false);
 
-  const mutation = useMutation({
+  const { proposeTransaction, getSafeUrl, isProposing } = useSafeTransaction();
+
+  const getEncodedTx = useMutation({
     mutationFn: proposeCreateCouncil,
-    onSuccess: (data) => {
-      onSuccess(data);
-    },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate(formData);
+    setStep('signing');
+    setErrorMessage(null);
+
+    try {
+      // Step 1: Get encoded transaction data from backend
+      const txResponse = await getEncodedTx.mutateAsync(formData);
+      
+      // Step 2: Propose to Safe Transaction Service (triggers wallet signing)
+      const result = await proposeTransaction(
+        {
+          to: txResponse.transaction.to,
+          data: txResponse.transaction.data,
+          value: txResponse.transaction.value,
+        },
+        {
+          actionType: 'create_council',
+          title: `Create Council: ${formData.name}`,
+          description: `Create a new ${formData.vertical} council with ${formData.quorumPercentage / 100}% quorum`,
+          metadata: {
+            name: formData.name,
+            vertical: formData.vertical,
+            quorumPercentage: formData.quorumPercentage,
+            votingPeriodDays: formData.votingPeriodDays,
+          },
+        }
+      );
+
+      if (result.success && result.safeTxHash) {
+        setSafeTxHash(result.safeTxHash);
+        setStep('success');
+      } else {
+        setErrorMessage(result.error || 'Failed to propose transaction');
+        setStep('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create transaction');
+      setStep('error');
+    }
   };
 
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const safeUrl = getSafeUrl();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {!txResult ? (
+        
+        {/* Form Step */}
+        {step === 'form' && (
           <>
             <h2 className="text-xl font-bold text-governance-100 mb-4">
               Create Council
@@ -353,157 +366,97 @@ function CreateCouncilModal({
                 </div>
               </div>
 
-              {mutation.error && (
-                <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger">
-                  {(mutation.error as Error).message}
-                </div>
-              )}
-
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={onClose} className="btn-secondary flex-1">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={mutation.isPending}
                   className="btn-primary flex-1 flex items-center justify-center gap-2"
                 >
-                  {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Generate Transaction
+                  Create & Sign
                 </button>
               </div>
             </form>
           </>
-        ) : (
-          <>
-            <h2 className="text-xl font-bold text-governance-100 mb-4">
-              Transaction Ready
-            </h2>
-            <div className="space-y-4">
-              <p className="text-sm text-governance-300">
-                Copy the transaction data below and create a new transaction in Safe.
-              </p>
-
-              <div>
-                <label className="block text-sm font-medium text-governance-400 mb-1">To</label>
-                <div className="font-mono text-sm bg-governance-800 p-2 rounded break-all text-governance-200">
-                  {txResult.transaction.to}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-governance-400 mb-1">Data</label>
-                <div className="relative">
-                  <div className="font-mono text-xs bg-governance-800 p-2 rounded break-all text-governance-200 max-h-32 overflow-y-auto">
-                    {txResult.transaction.data}
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(txResult.transaction.data)}
-                    className="absolute top-2 right-2 p-1 hover:bg-governance-700 rounded"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-success" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-governance-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-governance-400 mb-1">Value</label>
-                <div className="font-mono text-sm bg-governance-800 p-2 rounded text-governance-200">
-                  {txResult.transaction.value} ETH
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={onClose} className="btn-secondary flex-1">
-                  Close
-                </button>
-                <a
-                  href={txResult.safeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary flex-1 flex items-center justify-center gap-2"
-                >
-                  Open Safe
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-          </>
         )}
-      </div>
-    </div>
-  );
-}
 
-function TransactionResultModal({
-  result,
-  onClose,
-}: {
-  result: ProposeResponse;
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
+        {/* Signing Step */}
+        {step === 'signing' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              {isProposing ? 'Proposing Transaction...' : 'Preparing Transaction...'}
+            </h2>
+            <p className="text-governance-400">
+              {isProposing 
+                ? 'Please sign the transaction in your wallet'
+                : 'Encoding transaction data...'}
+            </p>
+          </div>
+        )}
 
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+        {/* Success Step */}
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              Transaction Proposed!
+            </h2>
+            <p className="text-governance-400 mb-6">
+              Your transaction has been submitted to the Safe. Other signers can now approve it.
+            </p>
+            
+            {safeTxHash && (
+              <div className="mb-6 p-3 bg-governance-800 rounded-lg">
+                <p className="text-xs text-governance-500 mb-1">Transaction Hash</p>
+                <p className="text-sm font-mono text-governance-300 break-all">
+                  {safeTxHash}
+                </p>
+              </div>
+            )}
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="card p-6 w-full max-w-lg">
-        <h2 className="text-xl font-bold text-governance-100 mb-4">
-          Transaction Ready
-        </h2>
-        <div className="space-y-4">
-          <p className="text-sm text-governance-300">{result.message}</p>
-
-          <div>
-            <label className="block text-sm font-medium text-governance-400 mb-1">To</label>
-            <div className="font-mono text-sm bg-governance-800 p-2 rounded break-all text-governance-200">
-              {result.transaction.to}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">
+                Close
+              </button>
+              <a
+                href={safeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary flex-1 flex items-center justify-center gap-2"
+              >
+                View in Safe
+                <ExternalLink className="w-4 h-4" />
+              </a>
             </div>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-governance-400 mb-1">Data</label>
-            <div className="relative">
-              <div className="font-mono text-xs bg-governance-800 p-2 rounded break-all text-governance-200 max-h-32 overflow-y-auto">
-                {result.transaction.data}
-              </div>
-              <button
-                onClick={() => copyToClipboard(result.transaction.data)}
-                className="absolute top-2 right-2 p-1 hover:bg-governance-700 rounded"
+        {/* Error Step */}
+        {step === 'error' && (
+          <div className="text-center py-6">
+            <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              Transaction Failed
+            </h2>
+            <p className="text-governance-400 mb-4">
+              {errorMessage || 'An error occurred while creating the transaction.'}
+            </p>
+            
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">
+                Close
+              </button>
+              <button 
+                onClick={() => setStep('form')} 
+                className="btn-primary flex-1"
               >
-                {copied ? (
-                  <Check className="w-4 h-4 text-success" />
-                ) : (
-                  <Copy className="w-4 h-4 text-governance-400" />
-                )}
+                Try Again
               </button>
             </div>
           </div>
-
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="btn-secondary flex-1">
-              Close
-            </button>
-            <a
-              href={result.safeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              Open Safe
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
