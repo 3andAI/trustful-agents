@@ -1,20 +1,39 @@
 import { type Address } from 'viem'
 
 // =============================================================================
-// Contract Addresses - UPDATE THESE WITH YOUR DEPLOYED ADDRESSES
+// Chain Configuration
+// =============================================================================
+
+export const CHAIN_ID = 84532 // Base Sepolia
+export const BLOCK_EXPLORER_URL = 'https://sepolia.basescan.org'
+
+// =============================================================================
+// Contract Addresses - Base Sepolia
 // =============================================================================
 
 export const CONTRACTS = {
-  // Base Sepolia (Chain ID: 84532)
-  mockUsdc: '0x63d5a529eD8a8192E2201c0cea4469397efE30Ba' as Address,
-  mockErc8004Registry: '0xb3B4b5042Fd3600404846671Ff5558719860b694' as Address,
+  usdc: '0x63d5a529eD8a8192E2201c0cea4469397efE30Ba' as Address,
+  erc8004Registry: '0xb3B4b5042Fd3600404846671Ff5558719860b694' as Address,
   collateralVault: '0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4' as Address,
   termsRegistry: '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d' as Address,
+  councilRegistry: '0x54996FAE14f35C32EfA2F0f92237e9B924a93F66' as Address,
   trustfulValidator: '0xe75817D8aADA91968AD492d583602Ec10B2569a6' as Address,
 } as const
 
 // =============================================================================
-// ABIs - Minimal ABIs for the provider flow
+// Constants
+// =============================================================================
+
+export const USDC_DECIMALS = 6
+export const GRACE_PERIOD_DAYS = 7
+export const GRACE_PERIOD_SECONDS = GRACE_PERIOD_DAYS * 24 * 60 * 60
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.trustful-agents.ai'
+
+// Check if contracts are configured
+export const isConfigured = CONTRACTS.usdc !== '0x0000000000000000000000000000000000000000'
+
+// =============================================================================
+// ABIs
 // =============================================================================
 
 export const MockUsdcAbi = [
@@ -64,7 +83,7 @@ export const MockUsdcAbi = [
   },
 ] as const
 
-export const MockErc8004RegistryAbi = [
+export const Erc8004RegistryAbi = [
   {
     type: 'function',
     name: 'mint',
@@ -103,7 +122,21 @@ export const MockErc8004RegistryAbi = [
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
+  // ERC721Enumerable
+  {
+    type: 'function',
+    name: 'tokenOfOwnerByIndex',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'index', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
 ] as const
+
+// Backwards compatibility alias
+export const MockErc8004RegistryAbi = Erc8004RegistryAbi
 
 export const CollateralVaultAbi = [
   {
