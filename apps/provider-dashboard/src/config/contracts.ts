@@ -18,6 +18,7 @@ export const CONTRACTS = {
   termsRegistry: '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d' as Address,
   councilRegistry: '0x54996FAE14f35C32EfA2F0f92237e9B924a93F66' as Address,
   trustfulValidator: '0xe75817D8aADA91968AD492d583602Ec10B2569a6' as Address,
+  claimsManager: '0x4826E3745cb63f91ED9d24Ff67a06aC200e1156b' as Address,
 } as const
 
 // =============================================================================
@@ -151,6 +152,30 @@ export const CollateralVaultAbi = [
   },
   {
     type: 'function',
+    name: 'initiateWithdrawal',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeWithdrawal',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'cancelWithdrawal',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'getAccount',
     inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [
@@ -172,6 +197,13 @@ export const CollateralVaultAbi = [
     name: 'getAvailableBalance',
     inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [{ name: 'available', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'gracePeriod',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
 ] as const
@@ -214,6 +246,41 @@ export const TermsRegistryAbi = [
     name: 'hasActiveTerms',
     inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getTermsHistory',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'versions',
+        type: 'tuple[]',
+        components: [
+          { name: 'contentHash', type: 'bytes32' },
+          { name: 'contentUri', type: 'string' },
+          { name: 'councilId', type: 'bytes32' },
+          { name: 'registeredAt', type: 'uint256' },
+          { name: 'active', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getTermsConfig',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'config',
+        type: 'tuple',
+        components: [
+          { name: 'activeVersion', type: 'uint256' },
+          { name: 'versionCount', type: 'uint256' },
+        ],
+      },
+    ],
     stateMutability: 'view',
   },
 ] as const
@@ -275,6 +342,98 @@ export const TrustfulValidatorAbi = [
     name: 'minimumCollateral',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const
+
+export const CouncilRegistryAbi = [
+  {
+    type: 'function',
+    name: 'getCouncil',
+    inputs: [{ name: 'councilId', type: 'bytes32' }],
+    outputs: [
+      {
+        name: 'council',
+        type: 'tuple',
+        components: [
+          { name: 'councilId', type: 'bytes32' },
+          { name: 'name', type: 'string' },
+          { name: 'description', type: 'string' },
+          { name: 'vertical', type: 'string' },
+          { name: 'memberCount', type: 'uint256' },
+          { name: 'quorumPercentage', type: 'uint256' },
+          { name: 'claimDepositPercentage', type: 'uint256' },
+          { name: 'votingPeriod', type: 'uint256' },
+          { name: 'evidencePeriod', type: 'uint256' },
+          { name: 'active', type: 'bool' },
+          { name: 'createdAt', type: 'uint256' },
+          { name: 'closedAt', type: 'uint256' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getActiveCouncils',
+    inputs: [],
+    outputs: [{ name: 'councilIds', type: 'bytes32[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isCouncilActive',
+    inputs: [{ name: 'councilId', type: 'bytes32' }],
+    outputs: [{ name: 'isActive', type: 'bool' }],
+    stateMutability: 'view',
+  },
+] as const
+
+export const ClaimsManagerAbi = [
+  {
+    type: 'function',
+    name: 'getClaim',
+    inputs: [{ name: 'claimId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'claim',
+        type: 'tuple',
+        components: [
+          { name: 'agentId', type: 'uint256' },
+          { name: 'claimant', type: 'address' },
+          { name: 'claimedAmount', type: 'uint256' },
+          { name: 'approvedAmount', type: 'uint256' },
+          { name: 'claimantDeposit', type: 'uint256' },
+          { name: 'lockedCollateral', type: 'uint256' },
+          { name: 'evidenceHash', type: 'bytes32' },
+          { name: 'evidenceUri', type: 'string' },
+          { name: 'paymentReceiptHash', type: 'bytes32' },
+          { name: 'councilId', type: 'bytes32' },
+          { name: 'providerAtClaimTime', type: 'address' },
+          { name: 'status', type: 'uint8' },
+          { name: 'filedAt', type: 'uint256' },
+          { name: 'evidenceDeadline', type: 'uint256' },
+          { name: 'votingDeadline', type: 'uint256' },
+          { name: 'votesFor', type: 'uint256' },
+          { name: 'votesAgainst', type: 'uint256' },
+          { name: 'votesAbstain', type: 'uint256' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getClaimsByAgent',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: 'claimIds', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getClaimCount',
+    inputs: [],
+    outputs: [{ name: 'count', type: 'uint256' }],
     stateMutability: 'view',
   },
 ] as const

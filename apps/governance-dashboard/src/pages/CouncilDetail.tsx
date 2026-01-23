@@ -13,15 +13,22 @@ import {
   AlertCircle,
   User,
   CheckCircle,
+  Bot,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getCouncil,
   getCouncilMembers,
+  getCouncilAgents,
+  getCouncils,
   canCloseCouncil,
   proposeCloseCouncil,
   proposeAddMember,
   proposeRemoveMember,
+  proposeReassignAgent,
   type CouncilMember,
+  type CouncilAgent,
+  type Council,
 } from '../lib/api';
 import { useSafeTransaction } from '../hooks/useSafe';
 
@@ -33,6 +40,7 @@ export default function CouncilDetailPage() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<CouncilMember | null>(null);
+  const [agentToReassign, setAgentToReassign] = useState<CouncilAgent | null>(null);
 
   const { data: council, isLoading: councilLoading, error: councilError } = useQuery({
     queryKey: ['council', councilId],
@@ -46,6 +54,17 @@ export default function CouncilDetailPage() {
     enabled: !!councilId,
   });
 
+  const { data: agentsData, isLoading: agentsLoading, refetch: refetchAgents } = useQuery({
+    queryKey: ['councilAgents', councilId],
+    queryFn: () => getCouncilAgents(councilId!),
+    enabled: !!councilId,
+  });
+
+  const { data: allCouncilsData } = useQuery({
+    queryKey: ['councils'],
+    queryFn: getCouncils,
+  });
+
   const { data: closeCheck } = useQuery({
     queryKey: ['canCloseCouncil', councilId],
     queryFn: () => canCloseCouncil(councilId!),
@@ -53,6 +72,8 @@ export default function CouncilDetailPage() {
   });
 
   const members = membersData?.members ?? [];
+  const agents = agentsData?.agents ?? [];
+  const allCouncils = allCouncilsData?.councils ?? [];
 
   if (councilLoading) {
     return (
@@ -177,6 +198,70 @@ export default function CouncilDetailPage() {
         )}
       </div>
 
+      {/* Assigned Agents */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-governance-100">Assigned Agents</h2>
+          <button
+            onClick={() => refetchAgents()}
+            className="btn-secondary flex items-center gap-2"
+            disabled={agentsLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${agentsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        {agentsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-accent" />
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="text-center py-8">
+            <Bot className="w-12 h-12 text-governance-600 mx-auto mb-3" />
+            <p className="text-governance-400">No agents assigned to this council</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {agents.map((agent) => (
+              <div 
+                key={agent.agentId}
+                className="flex items-center justify-between p-4 bg-governance-800/50 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-governance-100">{agent.name}</p>
+                    <p className="text-xs text-governance-500">Agent #{agent.agentId}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://provider.trustful-agents.ai/agents/${agent.agentId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-ghost p-2"
+                    title="View agent"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  {council.active && (
+                    <button
+                      onClick={() => setAgentToReassign(agent)}
+                      className="btn-secondary text-sm"
+                    >
+                      Reassign
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Modals */}
       {showAddMemberModal && (
         <AddMemberModal
@@ -202,6 +287,19 @@ export default function CouncilDetailPage() {
           councilName={council.name}
           member={memberToRemove}
           onClose={() => setMemberToRemove(null)}
+        />
+      )}
+
+      {agentToReassign && (
+        <ReassignAgentModal
+          agent={agentToReassign}
+          currentCouncilId={councilId!}
+          councils={allCouncils.filter(c => c.active && c.councilId !== councilId)}
+          onClose={() => setAgentToReassign(null)}
+          onSuccess={() => {
+            setAgentToReassign(null);
+            refetchAgents();
+          }}
         />
       )}
     </div>
@@ -686,6 +784,173 @@ function DeleteCouncilModal({
             <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
             <h2 className="text-xl font-bold text-governance-100 mb-2">Failed</h2>
             <p className="text-governance-400 mb-4">{errorMessage}</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="btn-secondary flex-1">Close</button>
+              <button onClick={() => setStep('form')} className="btn-primary flex-1">Try Again</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReassignAgentModal({
+  agent,
+  currentCouncilId,
+  councils,
+  onClose,
+  onSuccess,
+}: {
+  agent: CouncilAgent;
+  currentCouncilId: string;
+  councils: Council[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [step, setStep] = useState<ModalStep>('form');
+  const [newCouncilId, setNewCouncilId] = useState('');
+  const [safeTxHash, setSafeTxHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { proposeTransaction, getSafeUrl, isProposing } = useSafeTransaction();
+
+  const getEncodedTx = useMutation({
+    mutationFn: proposeReassignAgent,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouncilId) return;
+    
+    setStep('signing');
+    setErrorMessage(null);
+
+    try {
+      const txResponse = await getEncodedTx.mutateAsync({
+        agentId: agent.agentId,
+        newCouncilId,
+      });
+      
+      const selectedCouncil = councils.find(c => c.councilId === newCouncilId);
+      
+      const result = await proposeTransaction(
+        {
+          to: txResponse.transaction.to,
+          data: txResponse.transaction.data,
+          value: txResponse.transaction.value,
+        },
+        {
+          actionType: 'reassign_agent_council',
+          title: `Reassign ${agent.name} to ${selectedCouncil?.name || 'new council'}`,
+          description: `Reassign agent #${agent.agentId} from current council to ${selectedCouncil?.name}`,
+          metadata: {
+            agentId: agent.agentId,
+            agentName: agent.name,
+            fromCouncilId: currentCouncilId,
+            toCouncilId: newCouncilId,
+            toCouncilName: selectedCouncil?.name,
+          },
+        }
+      );
+
+      if (result.success && result.safeTxHash) {
+        setSafeTxHash(result.safeTxHash);
+        setStep('success');
+      } else {
+        setErrorMessage(result.error || 'Failed to propose transaction');
+        setStep('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create transaction');
+      setStep('error');
+    }
+  };
+
+  const safeUrl = getSafeUrl();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="card p-6 w-full max-w-md">
+        
+        {step === 'form' && (
+          <>
+            <h2 className="text-xl font-bold text-governance-100 mb-4">Reassign Agent</h2>
+            <p className="text-governance-400 mb-4">
+              Reassign <strong className="text-governance-200">{agent.name}</strong> (#{agent.agentId}) to a different council.
+            </p>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-governance-300 mb-1">New Council *</label>
+                <select
+                  value={newCouncilId}
+                  onChange={(e) => setNewCouncilId(e.target.value)}
+                  className="input w-full"
+                  required
+                >
+                  <option value="">Select a council...</option>
+                  {councils.map((c) => (
+                    <option key={c.councilId} value={c.councilId}>
+                      {c.name} ({c.vertical})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+                <button 
+                  type="submit" 
+                  className="btn-primary flex-1"
+                  disabled={!newCouncilId}
+                >
+                  Propose Reassignment
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {step === 'signing' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">
+              {isProposing ? 'Proposing Transaction...' : 'Preparing Transaction...'}
+            </h2>
+            <p className="text-governance-400">
+              {isProposing ? 'Please sign the transaction in your wallet' : 'Encoding transaction data...'}
+            </p>
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Transaction Proposed!</h2>
+            <p className="text-governance-400 mb-6">
+              The agent reassignment has been proposed. Other signers can now approve it.
+            </p>
+            {safeTxHash && (
+              <div className="mb-6 p-3 bg-governance-800 rounded-lg">
+                <p className="text-xs text-governance-500 mb-1">Transaction Hash</p>
+                <p className="text-sm font-mono text-governance-300 break-all">{safeTxHash}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => { onSuccess(); }} className="btn-secondary flex-1">Close</button>
+              <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                View in Safe <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div className="text-center py-6">
+            <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-governance-100 mb-2">Transaction Failed</h2>
+            <p className="text-governance-400 mb-4">{errorMessage || 'An error occurred.'}</p>
             <div className="flex gap-3">
               <button onClick={onClose} className="btn-secondary flex-1">Close</button>
               <button onClick={() => setStep('form')} className="btn-primary flex-1">Try Again</button>

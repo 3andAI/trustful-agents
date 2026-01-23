@@ -221,6 +221,151 @@ router.get(
 );
 
 /**
+ * GET /councils/:councilId/agents
+ * Get agents assigned to this council
+ */
+router.get(
+  '/:councilId/agents',
+  validateParams(councilIdSchema),
+  async (req, res: Response) => {
+    try {
+      const { councilId } = req.params;
+      
+      console.log(`Fetching agents for council ${councilId}`);
+      
+      // Import viem client
+      const { createPublicClient, http } = await import('viem');
+      const { baseSepolia } = await import('viem/chains');
+      
+      const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
+      const client = createPublicClient({
+        chain: baseSepolia,
+        transport: http(RPC_URL),
+      });
+      
+      // Contract addresses
+      const TERMS_REGISTRY = (process.env.TERMS_REGISTRY_ADDRESS || '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d') as Address;
+      const COUNCIL_REGISTRY = (process.env.COUNCIL_REGISTRY_ADDRESS || '0x54996FAE14f35C32EfA2F0f92237e9B924a93F66') as Address;
+      
+      const TermsRegistryABI = [
+        {
+          type: 'function',
+          name: 'getActiveTerms',
+          inputs: [{ name: 'agentId', type: 'uint256' }],
+          outputs: [
+            {
+              name: 'terms',
+              type: 'tuple',
+              components: [
+                { name: 'contentHash', type: 'bytes32' },
+                { name: 'contentUri', type: 'string' },
+                { name: 'councilId', type: 'bytes32' },
+                { name: 'registeredAt', type: 'uint256' },
+                { name: 'active', type: 'bool' },
+              ],
+            },
+            { name: 'version', type: 'uint256' },
+          ],
+          stateMutability: 'view',
+        },
+      ] as const;
+      
+      // CouncilRegistry ABI for checking governance overrides
+      const CouncilRegistryAgentABI = [
+        {
+          type: 'function',
+          name: 'getAgentCouncil',
+          inputs: [{ name: 'agentId', type: 'uint256' }],
+          outputs: [{ name: 'councilId', type: 'bytes32' }],
+          stateMutability: 'view',
+        },
+      ] as const;
+      
+      // Get all agents from database
+      const allAgents = await queryMany<{ agent_id: string; name: string; description: string | null; owner_address: string }>(
+        'SELECT agent_id, name, description, owner_address FROM agents ORDER BY agent_id::integer ASC'
+      );
+      
+      console.log(`Found ${allAgents.length} agents in database`);
+      
+      // Check each agent's council assignment
+      const assignedAgents: Array<{
+        agentId: string;
+        name: string;
+        description: string | null;
+        ownerAddress: string;
+      }> = [];
+      
+      for (const agent of allAgents) {
+        try {
+          // First check for governance override in CouncilRegistry
+          let effectiveCouncilId: string | null = null;
+          
+          try {
+            const overrideCouncilId = await client.readContract({
+              address: COUNCIL_REGISTRY,
+              abi: CouncilRegistryAgentABI,
+              functionName: 'getAgentCouncil',
+              args: [BigInt(agent.agent_id)],
+            });
+            
+            // If override is set (not zero), use it
+            if (overrideCouncilId && overrideCouncilId !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+              effectiveCouncilId = overrideCouncilId;
+              console.log(`Agent ${agent.agent_id}: using governance override council ${effectiveCouncilId}`);
+            }
+          } catch {
+            // No override, continue to check TermsRegistry
+          }
+          
+          // If no override, check TermsRegistry
+          if (!effectiveCouncilId) {
+            try {
+              const result = await client.readContract({
+                address: TERMS_REGISTRY,
+                abi: TermsRegistryABI,
+                functionName: 'getActiveTerms',
+                args: [BigInt(agent.agent_id)],
+              });
+              
+              const terms = result[0];
+              if (terms.active) {
+                effectiveCouncilId = terms.councilId;
+              }
+            } catch {
+              // No terms registered
+            }
+          }
+          
+          // Check if this agent belongs to the requested council
+          if (effectiveCouncilId && effectiveCouncilId.toLowerCase() === councilId.toLowerCase()) {
+            assignedAgents.push({
+              agentId: agent.agent_id,
+              name: agent.name,
+              description: agent.description,
+              ownerAddress: agent.owner_address,
+            });
+          }
+        } catch {
+          // Skip agent on error
+        }
+      }
+      
+      console.log(`Found ${assignedAgents.length} agents for council ${councilId}`);
+      
+      res.json({
+        councilId,
+        agents: assignedAgents,
+        count: assignedAgents.length,
+      });
+    } catch (error) {
+      console.error('Failed to fetch council agents:', error);
+      res.status(500).json({ error: 'Failed to fetch council agents' });
+    }
+  }
+);
+
+/**
  * GET /councils/:councilId/can-close
  * Check if council can be closed
  */

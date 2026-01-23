@@ -129,6 +129,89 @@ router.get('/:id', validateParams(agentIdParamSchema), async (req, res) => {
     }
 });
 /**
+ * POST /agents/propose-reassign
+ * Prepare agent reassignment (returns transaction data for Safe)
+ * Alternative endpoint that takes agentId in body
+ */
+router.post('/propose-reassign', requireAuth, requireSafeOwner, async (req, res) => {
+    try {
+        const { agentId, newCouncilId } = req.body;
+        if (!agentId || !newCouncilId) {
+            res.status(400).json({ error: 'agentId and newCouncilId are required' });
+            return;
+        }
+        const agentIdBigInt = BigInt(agentId);
+        const client = getClient();
+        // Check pending claims
+        const pendingClaims = await client.readContract({
+            address: CLAIMS_MANAGER_ADDRESS,
+            abi: ClaimsManagerABI,
+            functionName: 'getPendingClaimCount',
+            args: [agentIdBigInt],
+        });
+        if (Number(pendingClaims) > 0) {
+            res.status(400).json({
+                error: 'Agent has pending claims',
+                pendingClaims: Number(pendingClaims),
+                message: 'Cannot reassign agent with open claims.',
+            });
+            return;
+        }
+        // Verify new council exists and is active
+        const newCouncil = await client.readContract({
+            address: COUNCIL_REGISTRY_ADDRESS,
+            abi: CouncilRegistryABI,
+            functionName: 'getCouncil',
+            args: [newCouncilId],
+        });
+        if (Number(newCouncil.createdAt) === 0) {
+            res.status(400).json({ error: 'Target council does not exist' });
+            return;
+        }
+        if (!newCouncil.active) {
+            res.status(400).json({ error: 'Target council is not active' });
+            return;
+        }
+        // Get current council for logging
+        const currentCouncilId = await client.readContract({
+            address: COUNCIL_REGISTRY_ADDRESS,
+            abi: CouncilRegistryABI,
+            functionName: 'getAgentCouncil',
+            args: [agentIdBigInt],
+        });
+        // Encode the transaction data
+        const txData = encodeFunctionData({
+            abi: CouncilRegistryABI,
+            functionName: 'reassignAgentCouncil',
+            args: [agentIdBigInt, newCouncilId],
+        });
+        // Log the reassignment intent
+        await logAuditEvent('agent_reassigned', req.session.address, 'agent', agentId.toString(), {
+            fromCouncilId: currentCouncilId,
+            toCouncilId: newCouncilId,
+            toCouncilName: newCouncil.name,
+        });
+        res.json({
+            message: 'Reassignment prepared. Create Safe transaction with the provided data.',
+            transaction: {
+                to: COUNCIL_REGISTRY_ADDRESS,
+                data: txData,
+                value: '0',
+            },
+            details: {
+                agentId: agentId.toString(),
+                fromCouncilId: currentCouncilId,
+                toCouncilId: newCouncilId,
+                toCouncilName: newCouncil.name,
+            },
+        });
+    }
+    catch (error) {
+        console.error('Failed to prepare reassignment:', error);
+        res.status(500).json({ error: 'Failed to prepare reassignment' });
+    }
+});
+/**
  * POST /agents/:id/reassign
  * Prepare agent reassignment (returns transaction data for Safe)
  */

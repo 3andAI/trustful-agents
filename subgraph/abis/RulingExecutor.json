@@ -1,0 +1,57 @@
+[
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimExecuted",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "claimant", "type": "address", "indexed": true },
+      { "name": "compensationAmount", "type": "uint256", "indexed": false },
+      { "name": "councilFee", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "DepositDistributed",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "voterCount", "type": "uint256", "indexed": false },
+      { "name": "totalAmount", "type": "uint256", "indexed": false },
+      { "name": "amountPerVoter", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "DepositReturned",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "claimant", "type": "address", "indexed": true },
+      { "name": "amount", "type": "uint256", "indexed": false },
+      { "name": "reason", "type": "string", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CollateralUnlocked",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "PartialExecution",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "requestedAmount", "type": "uint256", "indexed": false },
+      { "name": "actualAmount", "type": "uint256", "indexed": false },
+      { "name": "reason", "type": "string", "indexed": false }
+    ]
+  }
+]

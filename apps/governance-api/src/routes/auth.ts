@@ -63,17 +63,7 @@ router.post(
       }
       
       // Check if user is a Safe owner (required for governance)
-      let isOwner = false;
-      try {
-        isOwner = await isSafeOwner(result.address);
-      } catch (safeError) {
-        console.error('Safe owner check failed:', safeError);
-        res.status(503).json({ 
-          error: 'Unable to verify Safe ownership. Please try again later.',
-        });
-        return;
-      }
-      
+      const isOwner = await isSafeOwner(result.address);
       if (!isOwner) {
         res.status(403).json({ 
           error: 'Access denied. Only Safe multisig owners can access the governance dashboard.',

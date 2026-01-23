@@ -311,3 +311,26 @@ BEGIN
     RETURN reset_count;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- Agents (Provider-managed agent metadata)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agents (
+    agent_id BIGINT PRIMARY KEY,
+    owner_address VARCHAR(42) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    capabilities TEXT[], -- Array of capability strings
+    website_url VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agents_owner ON agents(owner_address);
+
+DROP TRIGGER IF EXISTS update_agents_updated_at ON agents;
+CREATE TRIGGER update_agents_updated_at
+    BEFORE UPDATE ON agents
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

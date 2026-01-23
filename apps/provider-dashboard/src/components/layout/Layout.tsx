@@ -5,8 +5,7 @@ import { WalletStatus } from '../wallet'
 import { cn } from '../../lib/utils'
 
 const mainNavItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/agents', label: 'My Agents', icon: Bot },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/councils', label: 'Councils', icon: Shield },
 ]
 
@@ -42,7 +41,7 @@ export default function Layout() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-surface-800">
-            <NavLink to="/" className="flex items-center gap-3">
+            <a href="https://trustful-agents.ai" className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center">
                 <Bot className="w-5 h-5 text-white" />
               </div>
@@ -50,7 +49,7 @@ export default function Layout() {
                 <h1 className="font-semibold text-surface-100">Trustful</h1>
                 <p className="text-xs text-surface-400">Provider Dashboard</p>
               </div>
-            </NavLink>
+            </a>
           </div>
 
           {/* Main Navigation */}

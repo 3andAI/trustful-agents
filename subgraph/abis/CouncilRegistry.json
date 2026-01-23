@@ -1,0 +1,93 @@
+[
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CouncilCreated",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "name", "type": "string", "indexed": false },
+      { "name": "vertical", "type": "string", "indexed": false },
+      { "name": "quorumPercentage", "type": "uint256", "indexed": false },
+      { "name": "claimDepositPercentage", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CouncilClosed",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "timestamp", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CouncilUpdated",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CouncilDeactivated",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "CouncilActivated",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MemberAdded",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "member", "type": "address", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MemberRemoved",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "member", "type": "address", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MemberSuspended",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "member", "type": "address", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MemberReinstated",
+    "inputs": [
+      { "name": "councilId", "type": "bytes32", "indexed": true },
+      { "name": "member", "type": "address", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "AgentCouncilReassigned",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "oldCouncilId", "type": "bytes32", "indexed": true },
+      { "name": "newCouncilId", "type": "bytes32", "indexed": true }
+    ]
+  }
+]

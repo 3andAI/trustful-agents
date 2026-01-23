@@ -10,10 +10,13 @@ import { healthCheck as safeHealthCheck } from './services/safe.js';
 import { processEmailQueue } from './services/email.js';
 import { cleanupExpiredSessions } from './services/auth.js';
 import authRoutes from './routes/auth.js';
+import claimsRoutes from './routes/claims.js';
 import councilRoutes from './routes/councils-v2.js';
 import safeRoutes from './routes/safe.js';
 import agentRoutes from './routes/agents.js';
 import pendingRoutes from './routes/pending.js';
+import validationRoutes from './routes/validation.js';
+import providerAgentsRoutes from './routes/provider-agents.js';
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -47,6 +50,7 @@ else {
 app.use(cors({
     origin: CORS_ORIGIN.split(','),
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-owner-address'],
 }));
 // Rate limiting
 const limiter = rateLimit({
@@ -87,6 +91,9 @@ app.use('/councils', councilRoutes);
 app.use('/safe', safeRoutes);
 app.use('/agents', agentRoutes);
 app.use('/pending', pendingRoutes);
+app.use('/v1', validationRoutes);
+app.use('/provider/agents', providerAgentsRoutes);
+app.use('/claims', claimsRoutes);
 // Serve static frontend in production
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,7 +103,9 @@ app.use(express.static(frontendPath));
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/auth') || req.path.startsWith('/councils') ||
         req.path.startsWith('/safe') || req.path.startsWith('/agents') ||
-        req.path.startsWith('/health')) {
+        req.path.startsWith('/health') || req.path.startsWith('/v1') ||
+        req.path.startsWith('/pending') || req.path.startsWith('/provider') ||
+        req.path.startsWith('/claims')) {
         return next();
     }
     res.sendFile(path.join(frontendPath, 'index.html'));
@@ -104,7 +113,8 @@ app.get('*', (req, res, next) => {
 // 404 handler for API routes
 app.use((req, res, next) => {
     if (req.path.startsWith('/auth') || req.path.startsWith('/councils') ||
-        req.path.startsWith('/safe') || req.path.startsWith('/agents')) {
+        req.path.startsWith('/safe') || req.path.startsWith('/agents') ||
+        req.path.startsWith('/v1') || req.path.startsWith('/pending')) {
         res.status(404).json({ error: 'Not found' });
     }
     else {

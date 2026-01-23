@@ -1,7 +1,6 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Building2,
   LogOut,
   Shield,
   Menu,
@@ -15,7 +14,6 @@ import { getPendingTransactions } from '../lib/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/councils', label: 'Councils', icon: Building2 },
   { path: '/pending', label: 'Pending Votes', icon: Vote, showBadge: true },
 ];
 
@@ -59,7 +57,7 @@ export default function Layout() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-governance-800">
-            <div className="flex items-center gap-3">
+            <a href="https://trustful-agents.ai" className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
@@ -67,7 +65,7 @@ export default function Layout() {
                 <h1 className="font-semibold text-governance-100">Trustful</h1>
                 <p className="text-xs text-governance-400">Governance</p>
               </div>
-            </div>
+            </a>
           </div>
 
           {/* Navigation */}

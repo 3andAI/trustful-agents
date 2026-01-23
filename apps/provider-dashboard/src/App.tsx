@@ -1,16 +1,28 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAccount, useChainId } from 'wagmi'
+import { Suspense, lazy } from 'react'
 import { CHAIN_ID } from './config/contracts'
 import { ConnectPrompt } from './components/wallet'
 import Layout from './components/layout/Layout'
-import LandingPage from './pages/Landing'
-import DashboardPage from './pages/Dashboard'
-import AgentsPage from './pages/Agents'
-import NewAgentPage from './pages/NewAgent'
-import AgentDetailPage from './pages/AgentDetail'
-import { CollateralPage, TermsPage, ClaimsPage, IntegratePage, CouncilsPage } from './pages/Placeholders'
-import { Button, Alert } from './components/ui'
+import { Button, Alert, LoadingState } from './components/ui'
 import { AlertTriangle } from 'lucide-react'
+
+// Lazy load pages - they'll be loaded on demand
+const LandingPage = lazy(() => import('./pages/Landing'))
+const DashboardPage = lazy(() => import('./pages/Dashboard'))
+const NewAgentPage = lazy(() => import('./pages/NewAgent'))
+const AgentDetailPage = lazy(() => import('./pages/AgentDetail'))
+const CollateralPage = lazy(() => import('./pages/CollateralPage'))
+const TermsPage = lazy(() => import('./pages/TermsPage'))
+const IntegratePage = lazy(() => import('./pages/IntegratePage'))
+const ClaimsPage = lazy(() => import('./pages/ClaimsPage'))
+const ClaimDetailPage = lazy(() => import('./pages/ClaimDetailPage'))
+const CouncilsPage = lazy(() => import('./pages/Placeholders').then(m => ({ default: m.CouncilsPage })))
+
+// Loading fallback for lazy components
+function PageLoader() {
+  return <LoadingState message="Loading..." />
+}
 
 /**
  * Protected route wrapper
@@ -59,34 +71,39 @@ function NetworkSwitchPrompt() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Landing - handles mode detection */}
-        <Route path="/" element={<LandingPage />} />
-        
-        {/* Protected routes with layout */}
-        <Route element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route path="/dashboard" element={<DashboardPage />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Landing - handles mode detection */}
+          <Route path="/" element={<LandingPage />} />
           
-          {/* Agents */}
-          <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/agents/new" element={<NewAgentPage />} />
-          <Route path="/agents/:agentId" element={<AgentDetailPage />} />
-          <Route path="/agents/:agentId/collateral" element={<CollateralPage />} />
-          <Route path="/agents/:agentId/terms" element={<TermsPage />} />
-          <Route path="/agents/:agentId/claims" element={<ClaimsPage />} />
-          <Route path="/agents/:agentId/integrate" element={<IntegratePage />} />
+          {/* Protected routes with layout */}
+          <Route element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            
+            {/* Redirect old /agents to dashboard */}
+            <Route path="/agents" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Agent routes */}
+            <Route path="/agents/new" element={<NewAgentPage />} />
+            <Route path="/agents/:agentId" element={<AgentDetailPage />} />
+            <Route path="/agents/:agentId/collateral" element={<CollateralPage />} />
+            <Route path="/agents/:agentId/terms" element={<TermsPage />} />
+            <Route path="/agents/:agentId/claims" element={<ClaimsPage />} />
+            <Route path="/agents/:agentId/claims/:claimId" element={<ClaimDetailPage />} />
+            <Route path="/agents/:agentId/integrate" element={<IntegratePage />} />
+            
+            {/* Councils */}
+            <Route path="/councils" element={<CouncilsPage />} />
+          </Route>
           
-          {/* Councils */}
-          <Route path="/councils" element={<CouncilsPage />} />
-        </Route>
-        
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

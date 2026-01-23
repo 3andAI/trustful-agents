@@ -1,0 +1,626 @@
+// Claims Routes - Extension for governance-api
+// Add this file to governance-api/src/routes/claims.ts
+// Then add to index.ts: import claimsRoutes from './routes/claims.js';
+// And: app.use('/claims', claimsRoutes);
+
+import { Router, Request, Response } from 'express';
+import { publicClient, CHAIN_ID, RPC_URL } from '../services/blockchain.js';
+import { db } from '../db/index.js';
+import { type Address, type Hex, encodeFunctionData, parseAbi } from 'viem';
+
+const router = Router();
+
+// ============================================================================
+// Contract Configuration
+// ============================================================================
+
+const CLAIMS_MANAGER_ADDRESS = process.env.CLAIMS_MANAGER_ADDRESS as Address;
+const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS as Address;
+
+// ============================================================================
+// ABI Definitions
+// ============================================================================
+
+const claimsManagerABI = parseAbi([
+  // View functions
+  'function getClaim(uint256 claimId) view returns ((uint256 claimId, uint256 agentId, address claimant, uint256 claimedAmount, uint256 approvedAmount, bytes32 evidenceHash, string evidenceUri, bytes32 paymentReceiptHash, bytes32 termsHashAtClaimTime, uint256 termsVersionAtClaimTime, address providerAtClaimTime, bytes32 councilId, uint256 claimantDeposit, uint256 lockedCollateral, uint8 status, uint256 filedAt, uint256 evidenceDeadline, uint256 votingDeadline, bool hadVotes))',
+  'function getClaimsByCouncil(bytes32 councilId) view returns (uint256[])',
+  'function getPendingClaimsByCouncil(bytes32 councilId) view returns (uint256[])',
+  'function getClaimsByClaimant(address claimant) view returns (uint256[])',
+  'function getClaimsByAgent(uint256 agentId) view returns (uint256[])',
+  'function getVotingProgress(uint256 claimId) view returns ((uint256 approveVotes, uint256 rejectVotes, uint256 abstainVotes, uint256 totalVotes, uint256 requiredQuorum, uint256 deadline, bool quorumReached))',
+  'function getVotes(uint256 claimId) view returns ((address voter, uint8 vote, uint256 approvedAmount, string reasoning, uint256 votedAt, uint256 lastChangedAt)[])',
+  'function getVote(uint256 claimId, address voter) view returns ((address voter, uint8 vote, uint256 approvedAmount, string reasoning, uint256 votedAt, uint256 lastChangedAt))',
+  'function hasVoted(uint256 claimId, address voter) view returns (bool)',
+  'function getVotersForClaim(uint256 claimId) view returns (address[])',
+  'function calculateRequiredDeposit(uint256 agentId, uint256 claimedAmount) view returns (uint256)',
+  'function nextClaimId() view returns (uint256)',
+  'function getClaimStats(uint256 agentId) view returns ((uint256 totalClaims, uint256 approvedClaims, uint256 rejectedClaims, uint256 pendingClaims, uint256 expiredClaims, uint256 totalPaidOut))',
+  'function calculateMedianApprovedAmount(uint256 claimId) view returns (uint256)',
+  // Write functions (for tx data encoding)
+  'function fileClaim(uint256 agentId, uint256 claimedAmount, bytes32 evidenceHash, string evidenceUri, bytes32 paymentReceiptHash) returns (uint256)',
+  'function submitAdditionalEvidence(uint256 claimId, bytes32 evidenceHash, string evidenceUri)',
+  'function castVote(uint256 claimId, uint8 vote, uint256 approvedAmount, string reasoning)',
+  'function changeVote(uint256 claimId, uint8 vote, uint256 approvedAmount, string reasoning)',
+  'function finalizeClaim(uint256 claimId)',
+  'function cancelClaim(uint256 claimId)',
+]);
+
+const councilRegistryABI = parseAbi([
+  'function isActiveMember(bytes32 councilId, address member) view returns (bool)',
+  'function getCouncilMembers(bytes32 councilId) view returns (address[])',
+  'function getCouncil(bytes32 councilId) view returns ((bytes32 councilId, string name, string description, string vertical, uint256 memberCount, uint256 quorumPercentage, uint256 claimDepositPercentage, uint256 votingPeriod, uint256 evidencePeriod, bool active, uint256 createdAt, uint256 closedAt))',
+]);
+
+// ============================================================================
+// Types
+// ============================================================================
+
+enum ClaimStatus {
+  Filed = 0,
+  EvidenceClosed = 1,
+  VotingClosed = 2,
+  Approved = 3,
+  Rejected = 4,
+  Executed = 5,
+  Cancelled = 6,
+  Expired = 7,
+}
+
+enum Vote {
+  None = 0,
+  Approve = 1,
+  Reject = 2,
+  Abstain = 3,
+}
+
+interface ClaimResponse {
+  claimId: string;
+  agentId: string;
+  claimant: string;
+  claimedAmount: string;
+  approvedAmount: string;
+  evidenceHash: string;
+  evidenceUri: string;
+  paymentReceiptHash: string;
+  termsHashAtClaimTime: string;
+  termsVersionAtClaimTime: string;
+  providerAtClaimTime: string;
+  councilId: string;
+  claimantDeposit: string;
+  lockedCollateral: string;
+  status: string;
+  statusCode: number;
+  filedAt: string;
+  evidenceDeadline: string;
+  votingDeadline: string;
+  hadVotes: boolean;
+  // Computed fields
+  isInEvidencePeriod: boolean;
+  isInVotingPeriod: boolean;
+  canVote: boolean;
+  canFinalize: boolean;
+}
+
+interface VoteResponse {
+  voter: string;
+  vote: string;
+  voteCode: number;
+  approvedAmount: string;
+  reasoning: string;
+  votedAt: string;
+  lastChangedAt: string | null;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function statusToString(status: number): string {
+  const statuses = ['Filed', 'EvidenceClosed', 'VotingClosed', 'Approved', 'Rejected', 'Executed', 'Cancelled', 'Expired'];
+  return statuses[status] || 'Unknown';
+}
+
+function voteToString(vote: number): string {
+  const votes = ['None', 'Approve', 'Reject', 'Abstain'];
+  return votes[vote] || 'Unknown';
+}
+
+function formatClaim(claim: any): ClaimResponse {
+  const now = Math.floor(Date.now() / 1000);
+  const evidenceDeadline = Number(claim.evidenceDeadline);
+  const votingDeadline = Number(claim.votingDeadline);
+  const status = Number(claim.status);
+  
+  return {
+    claimId: claim.claimId.toString(),
+    agentId: claim.agentId.toString(),
+    claimant: claim.claimant,
+    claimedAmount: claim.claimedAmount.toString(),
+    approvedAmount: claim.approvedAmount.toString(),
+    evidenceHash: claim.evidenceHash,
+    evidenceUri: claim.evidenceUri,
+    paymentReceiptHash: claim.paymentReceiptHash,
+    termsHashAtClaimTime: claim.termsHashAtClaimTime,
+    termsVersionAtClaimTime: claim.termsVersionAtClaimTime.toString(),
+    providerAtClaimTime: claim.providerAtClaimTime,
+    councilId: claim.councilId,
+    claimantDeposit: claim.claimantDeposit.toString(),
+    lockedCollateral: claim.lockedCollateral.toString(),
+    status: statusToString(status),
+    statusCode: status,
+    filedAt: new Date(Number(claim.filedAt) * 1000).toISOString(),
+    evidenceDeadline: new Date(evidenceDeadline * 1000).toISOString(),
+    votingDeadline: new Date(votingDeadline * 1000).toISOString(),
+    hadVotes: claim.hadVotes,
+    // Computed fields
+    isInEvidencePeriod: now < evidenceDeadline && status === ClaimStatus.Filed,
+    isInVotingPeriod: now >= evidenceDeadline && now < votingDeadline && (status === ClaimStatus.Filed || status === ClaimStatus.EvidenceClosed),
+    canVote: now >= evidenceDeadline && now < votingDeadline && (status === ClaimStatus.Filed || status === ClaimStatus.EvidenceClosed),
+    canFinalize: now >= votingDeadline && status <= ClaimStatus.VotingClosed,
+  };
+}
+
+function formatVote(vote: any): VoteResponse {
+  return {
+    voter: vote.voter,
+    vote: voteToString(Number(vote.vote)),
+    voteCode: Number(vote.vote),
+    approvedAmount: vote.approvedAmount.toString(),
+    reasoning: vote.reasoning,
+    votedAt: new Date(Number(vote.votedAt) * 1000).toISOString(),
+    lastChangedAt: Number(vote.lastChangedAt) > 0 ? new Date(Number(vote.lastChangedAt) * 1000).toISOString() : null,
+  };
+}
+
+// ============================================================================
+// Routes
+// ============================================================================
+
+// GET /claims - List claims with filters
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { councilId, status, claimant, agentId, pending } = req.query;
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    let claimIds: bigint[] = [];
+    
+    if (councilId) {
+      if (pending === 'true') {
+        claimIds = await publicClient.readContract({
+          address: CLAIMS_MANAGER_ADDRESS,
+          abi: claimsManagerABI,
+          functionName: 'getPendingClaimsByCouncil',
+          args: [councilId as Hex],
+        }) as bigint[];
+      } else {
+        claimIds = await publicClient.readContract({
+          address: CLAIMS_MANAGER_ADDRESS,
+          abi: claimsManagerABI,
+          functionName: 'getClaimsByCouncil',
+          args: [councilId as Hex],
+        }) as bigint[];
+      }
+    } else if (claimant) {
+      claimIds = await publicClient.readContract({
+        address: CLAIMS_MANAGER_ADDRESS,
+        abi: claimsManagerABI,
+        functionName: 'getClaimsByClaimant',
+        args: [claimant as Address],
+      }) as bigint[];
+    } else if (agentId) {
+      claimIds = await publicClient.readContract({
+        address: CLAIMS_MANAGER_ADDRESS,
+        abi: claimsManagerABI,
+        functionName: 'getClaimsByAgent',
+        args: [BigInt(agentId as string)],
+      }) as bigint[];
+    } else {
+      // Get total claims and fetch recent ones
+      const nextId = await publicClient.readContract({
+        address: CLAIMS_MANAGER_ADDRESS,
+        abi: claimsManagerABI,
+        functionName: 'nextClaimId',
+      }) as bigint;
+      
+      // Get last 50 claims max
+      const start = nextId > 50n ? nextId - 50n : 0n;
+      for (let i = start; i < nextId; i++) {
+        claimIds.push(i);
+      }
+    }
+    
+    // Fetch claim details
+    const claims: ClaimResponse[] = [];
+    for (const claimId of claimIds) {
+      try {
+        const claim = await publicClient.readContract({
+          address: CLAIMS_MANAGER_ADDRESS,
+          abi: claimsManagerABI,
+          functionName: 'getClaim',
+          args: [claimId],
+        });
+        
+        const formatted = formatClaim(claim);
+        
+        // Apply status filter if provided
+        if (status && formatted.status.toLowerCase() !== (status as string).toLowerCase()) {
+          continue;
+        }
+        
+        claims.push(formatted);
+      } catch (error) {
+        console.warn(`Failed to fetch claim ${claimId}:`, error);
+      }
+    }
+    
+    // Sort by filed date descending (newest first)
+    claims.sort((a, b) => new Date(b.filedAt).getTime() - new Date(a.filedAt).getTime());
+    
+    res.json({ claims, count: claims.length });
+  } catch (error) {
+    console.error('Error fetching claims:', error);
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+// GET /claims/:claimId - Get claim details
+router.get('/:claimId', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    const claim = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'getClaim',
+      args: [BigInt(claimId)],
+    });
+    
+    const formatted = formatClaim(claim);
+    
+    // Get voting progress
+    const progress = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'getVotingProgress',
+      args: [BigInt(claimId)],
+    }) as any;
+    
+    // Get council info for context
+    let councilName = '';
+    try {
+      const council = await publicClient.readContract({
+        address: COUNCIL_REGISTRY_ADDRESS,
+        abi: councilRegistryABI,
+        functionName: 'getCouncil',
+        args: [formatted.councilId as Hex],
+      }) as any;
+      councilName = council.name;
+    } catch {}
+    
+    res.json({
+      ...formatted,
+      councilName,
+      votingProgress: {
+        approveVotes: progress.approveVotes.toString(),
+        rejectVotes: progress.rejectVotes.toString(),
+        abstainVotes: progress.abstainVotes.toString(),
+        totalVotes: progress.totalVotes.toString(),
+        requiredQuorum: progress.requiredQuorum.toString(),
+        deadline: new Date(Number(progress.deadline) * 1000).toISOString(),
+        quorumReached: progress.quorumReached,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching claim:', error);
+    res.status(500).json({ error: 'Failed to fetch claim' });
+  }
+});
+
+// GET /claims/:claimId/votes - Get all votes for a claim
+router.get('/:claimId/votes', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    const votes = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'getVotes',
+      args: [BigInt(claimId)],
+    }) as any[];
+    
+    const formattedVotes = votes.map(formatVote);
+    
+    res.json({ votes: formattedVotes, count: formattedVotes.length });
+  } catch (error) {
+    console.error('Error fetching votes:', error);
+    res.status(500).json({ error: 'Failed to fetch votes' });
+  }
+});
+
+// GET /claims/:claimId/my-vote - Check if address has voted
+router.get('/:claimId/my-vote', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    const { address } = req.query;
+    
+    if (!address) {
+      return res.status(400).json({ error: 'address query parameter required' });
+    }
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    const hasVoted = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'hasVoted',
+      args: [BigInt(claimId), address as Address],
+    }) as boolean;
+    
+    if (!hasVoted) {
+      return res.json({ hasVoted: false, vote: null });
+    }
+    
+    const vote = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'getVote',
+      args: [BigInt(claimId), address as Address],
+    });
+    
+    res.json({ hasVoted: true, vote: formatVote(vote) });
+  } catch (error) {
+    console.error('Error fetching my vote:', error);
+    res.status(500).json({ error: 'Failed to fetch vote' });
+  }
+});
+
+// POST /claims/:claimId/vote - Get transaction data for voting
+router.post('/:claimId/vote', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    const { vote, approvedAmount, reasoning, voterAddress } = req.body;
+    
+    if (vote === undefined || voterAddress === undefined) {
+      return res.status(400).json({ error: 'vote and voterAddress are required' });
+    }
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    // Check if already voted
+    const hasVoted = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'hasVoted',
+      args: [BigInt(claimId), voterAddress as Address],
+    }) as boolean;
+    
+    // Encode the appropriate function
+    const functionName = hasVoted ? 'changeVote' : 'castVote';
+    const data = encodeFunctionData({
+      abi: claimsManagerABI,
+      functionName,
+      args: [
+        BigInt(claimId),
+        vote,
+        BigInt(approvedAmount || '0'),
+        reasoning || '',
+      ],
+    });
+    
+    res.json({
+      transaction: {
+        to: CLAIMS_MANAGER_ADDRESS,
+        data,
+        value: '0',
+      },
+      isChangeVote: hasVoted,
+      message: hasVoted ? 'Transaction to change your vote' : 'Transaction to cast your vote',
+    });
+  } catch (error) {
+    console.error('Error preparing vote transaction:', error);
+    res.status(500).json({ error: 'Failed to prepare vote transaction' });
+  }
+});
+
+// POST /claims/:claimId/finalize - Get transaction data for finalization
+router.post('/:claimId/finalize', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    const data = encodeFunctionData({
+      abi: claimsManagerABI,
+      functionName: 'finalizeClaim',
+      args: [BigInt(claimId)],
+    });
+    
+    res.json({
+      transaction: {
+        to: CLAIMS_MANAGER_ADDRESS,
+        data,
+        value: '0',
+      },
+      message: 'Transaction to finalize claim',
+    });
+  } catch (error) {
+    console.error('Error preparing finalize transaction:', error);
+    res.status(500).json({ error: 'Failed to prepare finalize transaction' });
+  }
+});
+
+// GET /members/:address/councils - Get councils where address is a member
+router.get('/members/:address/councils', async (req: Request, res: Response) => {
+  try {
+    const { address } = req.params;
+    
+    if (!COUNCIL_REGISTRY_ADDRESS) {
+      return res.status(500).json({ error: 'COUNCIL_REGISTRY_ADDRESS not configured' });
+    }
+    
+    // Get all active councils
+    const councilIds = await publicClient.readContract({
+      address: COUNCIL_REGISTRY_ADDRESS,
+      abi: parseAbi(['function getActiveCouncils() view returns (bytes32[])']),
+      functionName: 'getActiveCouncils',
+    }) as Hex[];
+    
+    const memberCouncils: any[] = [];
+    
+    for (const councilId of councilIds) {
+      const isMember = await publicClient.readContract({
+        address: COUNCIL_REGISTRY_ADDRESS,
+        abi: councilRegistryABI,
+        functionName: 'isActiveMember',
+        args: [councilId, address as Address],
+      }) as boolean;
+      
+      if (isMember) {
+        const council = await publicClient.readContract({
+          address: COUNCIL_REGISTRY_ADDRESS,
+          abi: councilRegistryABI,
+          functionName: 'getCouncil',
+          args: [councilId],
+        }) as any;
+        
+        memberCouncils.push({
+          councilId,
+          name: council.name,
+          description: council.description,
+          vertical: council.vertical,
+          memberCount: Number(council.memberCount),
+        });
+      }
+    }
+    
+    res.json({ councils: memberCouncils, count: memberCouncils.length });
+  } catch (error) {
+    console.error('Error fetching member councils:', error);
+    res.status(500).json({ error: 'Failed to fetch member councils' });
+  }
+});
+
+// GET /members/:address/pending-claims - Get pending claims for member's councils
+router.get('/members/:address/pending-claims', async (req: Request, res: Response) => {
+  try {
+    const { address } = req.params;
+    
+    if (!COUNCIL_REGISTRY_ADDRESS || !CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'Contract addresses not configured' });
+    }
+    
+    // Get member's councils
+    const councilIds = await publicClient.readContract({
+      address: COUNCIL_REGISTRY_ADDRESS,
+      abi: parseAbi(['function getActiveCouncils() view returns (bytes32[])']),
+      functionName: 'getActiveCouncils',
+    }) as Hex[];
+    
+    const pendingClaims: ClaimResponse[] = [];
+    
+    for (const councilId of councilIds) {
+      const isMember = await publicClient.readContract({
+        address: COUNCIL_REGISTRY_ADDRESS,
+        abi: councilRegistryABI,
+        functionName: 'isActiveMember',
+        args: [councilId, address as Address],
+      }) as boolean;
+      
+      if (isMember) {
+        const claimIds = await publicClient.readContract({
+          address: CLAIMS_MANAGER_ADDRESS,
+          abi: claimsManagerABI,
+          functionName: 'getPendingClaimsByCouncil',
+          args: [councilId],
+        }) as bigint[];
+        
+        for (const claimId of claimIds) {
+          try {
+            const claim = await publicClient.readContract({
+              address: CLAIMS_MANAGER_ADDRESS,
+              abi: claimsManagerABI,
+              functionName: 'getClaim',
+              args: [claimId],
+            });
+            
+            const formatted = formatClaim(claim);
+            
+            // Check if this member has voted
+            const hasVoted = await publicClient.readContract({
+              address: CLAIMS_MANAGER_ADDRESS,
+              abi: claimsManagerABI,
+              functionName: 'hasVoted',
+              args: [claimId, address as Address],
+            }) as boolean;
+            
+            pendingClaims.push({
+              ...formatted,
+              hasVoted,
+            } as any);
+          } catch (error) {
+            console.warn(`Failed to fetch claim ${claimId}:`, error);
+          }
+        }
+      }
+    }
+    
+    // Sort by voting deadline (most urgent first)
+    pendingClaims.sort((a, b) => new Date(a.votingDeadline).getTime() - new Date(b.votingDeadline).getTime());
+    
+    res.json({ claims: pendingClaims, count: pendingClaims.length });
+  } catch (error) {
+    console.error('Error fetching pending claims:', error);
+    res.status(500).json({ error: 'Failed to fetch pending claims' });
+  }
+});
+
+// GET /deposit-calculator - Calculate required deposit for a claim
+router.get('/deposit-calculator', async (req: Request, res: Response) => {
+  try {
+    const { agentId, claimedAmount } = req.query;
+    
+    if (!agentId || !claimedAmount) {
+      return res.status(400).json({ error: 'agentId and claimedAmount query parameters required' });
+    }
+    
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    const deposit = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
+      abi: claimsManagerABI,
+      functionName: 'calculateRequiredDeposit',
+      args: [BigInt(agentId as string), BigInt(claimedAmount as string)],
+    }) as bigint;
+    
+    res.json({
+      agentId: agentId,
+      claimedAmount: claimedAmount,
+      requiredDeposit: deposit.toString(),
+    });
+  } catch (error) {
+    console.error('Error calculating deposit:', error);
+    res.status(500).json({ error: 'Failed to calculate deposit' });
+  }
+});
+
+export default router;

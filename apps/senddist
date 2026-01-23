@@ -1,0 +1,1 @@
+scp -i ~/.ssh/trusted-aws.pem ./dist.zip ubuntu@18.184.253.44:/home/ubuntu/projects/trustful-agents/apps

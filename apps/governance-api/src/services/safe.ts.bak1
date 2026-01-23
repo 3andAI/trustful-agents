@@ -1,0 +1,307 @@
+import SafeApiKit from '@safe-global/api-kit';
+import Safe from '@safe-global/protocol-kit';
+import {
+  MetaTransactionData,
+  OperationType,
+} from '@safe-global/types-kit';
+import { createPublicClient, http, type Address } from 'viem';
+import { base, baseSepolia } from 'viem/chains';
+import type { SafeInfo, SafeTransactionResponse } from '../types/index.js';
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
+const SAFE_ADDRESS = process.env.SAFE_ADDRESS as Address;
+const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
+
+// ============================================================================
+// Clients
+// ============================================================================
+
+let apiKit: SafeApiKit | null = null;
+
+// Safe Transaction Service URLs (without trailing slash)
+const SAFE_TX_SERVICE_URLS: Record<number, string> = {
+  8453: 'https://safe-transaction-base.safe.global',
+  84532: 'https://safe-transaction-base-sepolia.safe.global',
+};
+
+function getApiKit(): SafeApiKit {
+  if (!apiKit) {
+    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
+    if (!txServiceUrl) {
+      throw new Error(`No Safe Transaction Service URL for chain ${CHAIN_ID}`);
+    }
+    
+    apiKit = new SafeApiKit({
+      chainId: BigInt(CHAIN_ID),
+      txServiceUrl,
+    });
+  }
+  return apiKit;
+}
+
+function getViemClient() {
+  const chain = CHAIN_ID === 8453 ? base : baseSepolia;
+  return createPublicClient({
+    chain,
+    transport: http(RPC_URL),
+  });
+}
+
+// ============================================================================
+// Safe Info
+// ============================================================================
+
+export async function getSafeInfo(): Promise<SafeInfo> {
+  const kit = getApiKit();
+  const info = await kit.getSafeInfo(SAFE_ADDRESS);
+  
+  return {
+    address: SAFE_ADDRESS,
+    threshold: info.threshold,
+    owners: info.owners,
+    nonce: info.nonce,
+  };
+}
+
+export async function getSafeOwners(): Promise<string[]> {
+  const info = await getSafeInfo();
+  return info.owners.map((o) => o.toLowerCase());
+}
+
+export async function isSafeOwner(address: string): Promise<boolean> {
+  const owners = await getSafeOwners();
+  return owners.includes(address.toLowerCase());
+}
+
+// ============================================================================
+// Transaction Management
+// ============================================================================
+
+export async function getPendingTransactions(): Promise<SafeTransactionResponse[]> {
+  const kit = getApiKit();
+  const response = await kit.getPendingTransactions(SAFE_ADDRESS);
+  
+  return response.results.map((tx) => ({
+    safeTxHash: tx.safeTxHash,
+    to: tx.to,
+    data: tx.data || '0x',
+    value: tx.value,
+    operation: tx.operation,
+    nonce: tx.nonce,
+    confirmations: tx.confirmations?.length || 0,
+    confirmationsRequired: tx.confirmationsRequired,
+    isExecuted: tx.isExecuted,
+    proposer: tx.proposer || '',
+    description: parseTransactionDescription(tx.to, tx.data || '0x'),
+  }));
+}
+
+export async function getTransaction(safeTxHash: string): Promise<SafeTransactionResponse | null> {
+  try {
+    const kit = getApiKit();
+    const tx = await kit.getTransaction(safeTxHash);
+    
+    return {
+      safeTxHash: tx.safeTxHash,
+      to: tx.to,
+      data: tx.data || '0x',
+      value: tx.value,
+      operation: tx.operation,
+      nonce: tx.nonce,
+      confirmations: tx.confirmations?.length || 0,
+      confirmationsRequired: tx.confirmationsRequired,
+      isExecuted: tx.isExecuted,
+      proposer: tx.proposer || '',
+      description: parseTransactionDescription(tx.to, tx.data || '0x'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
+// Transaction Proposal
+// ============================================================================
+
+export interface ProposeTransactionParams {
+  to: Address;
+  data: `0x${string}`;
+  value?: string;
+  signerPrivateKey?: `0x${string}`; // Optional: for server-side signing
+  signerAddress: Address; // The proposer's address
+}
+
+export async function proposeTransaction(
+  params: ProposeTransactionParams
+): Promise<string> {
+  const { to, data, value = '0', signerAddress } = params;
+  
+  const kit = getApiKit();
+  
+  // Create transaction data
+  const safeTransactionData: MetaTransactionData = {
+    to,
+    data,
+    value,
+    operation: OperationType.Call,
+  };
+  
+  // If we have a private key, we can sign server-side
+  // Otherwise, return unsigned transaction for client-side signing
+  if (params.signerPrivateKey) {
+    // Initialize Safe with signer (protocol-kit v6)
+    const protocolKit = await Safe.init({
+      provider: RPC_URL,
+      signer: params.signerPrivateKey,
+      safeAddress: SAFE_ADDRESS,
+    });
+    
+    // Create transaction
+    const safeTransaction = await protocolKit.createTransaction({
+      transactions: [safeTransactionData],
+    });
+    
+    // Sign transaction
+    const signedTransaction = await protocolKit.signTransaction(safeTransaction);
+    
+    // Get transaction hash
+    const safeTxHash = await protocolKit.getTransactionHash(signedTransaction);
+    
+    // Get signature for the signer
+    const signerSignature = signedTransaction.getSignature(signerAddress.toLowerCase());
+    
+    // Propose to Safe Transaction Service
+    await kit.proposeTransaction({
+      safeAddress: SAFE_ADDRESS,
+      safeTransactionData: signedTransaction.data,
+      safeTxHash,
+      senderAddress: signerAddress,
+      senderSignature: signerSignature?.data || '',
+    });
+    
+    return safeTxHash;
+  }
+  
+  // For client-side signing, we need to return the transaction data
+  // The client will sign and submit
+  throw new Error('Client-side signing not yet implemented - provide signerPrivateKey');
+}
+
+// ============================================================================
+// Transaction Signing
+// ============================================================================
+
+export async function signTransaction(
+  safeTxHash: string,
+  signerPrivateKey: `0x${string}`,
+  signerAddress: Address
+): Promise<void> {
+  const kit = getApiKit();
+  
+  // Get the transaction
+  const tx = await kit.getTransaction(safeTxHash);
+  
+  // Initialize Safe with signer
+  const protocolKit = await Safe.init({
+    provider: RPC_URL,
+    signer: signerPrivateKey,
+    safeAddress: SAFE_ADDRESS,
+  });
+  
+  // Create Safe transaction from existing data
+  const safeTransaction = await protocolKit.createTransaction({
+    transactions: [{
+      to: tx.to,
+      data: tx.data || '0x',
+      value: tx.value,
+      operation: tx.operation as OperationType,
+    }],
+  });
+  
+  // Sign the hash
+  const signature = await protocolKit.signHash(safeTxHash);
+  
+  // Submit confirmation
+  await kit.confirmTransaction(safeTxHash, signature.data);
+}
+
+// ============================================================================
+// Transaction Helpers
+// ============================================================================
+
+// Known function selectors for governance actions
+const FUNCTION_SELECTORS: Record<string, string> = {
+  '0x3d91a2a1': 'createCouncil',
+  '0x8456cb59': 'closeCouncil', 
+  '0x0d8e6e2c': 'addMember',
+  '0x0b1ca49a': 'removeMember',
+  '0x7f6d4b4a': 'reassignAgentCouncil',
+  '0x5c975abb': 'pause',
+  '0x3f4ba83a': 'unpause',
+};
+
+function parseTransactionDescription(to: string, data: string): string {
+  if (data.length < 10) return 'Unknown transaction';
+  
+  const selector = data.slice(0, 10);
+  const functionName = FUNCTION_SELECTORS[selector];
+  
+  if (functionName) {
+    return `${functionName} on ${to.slice(0, 10)}...`;
+  }
+  
+  return `Call to ${to.slice(0, 10)}...`;
+}
+
+// ============================================================================
+// Governance Contract Helpers
+// ============================================================================
+
+export function encodeCreateCouncil(
+  name: string,
+  description: string,
+  vertical: string,
+  quorumPercentage: number,
+  claimDepositPercentage: number,
+  votingPeriod: number,
+  evidencePeriod: number
+): `0x${string}` {
+  // ABI encode createCouncil call
+  // createCouncil(string,string,string,uint256,uint256,uint256,uint256)
+  const client = getViemClient();
+  // We'd need the full ABI here - simplified for now
+  // In production, import the actual ABI from the SDK
+  return '0x' as `0x${string}`;
+}
+
+export function encodeAddMember(councilId: `0x${string}`, member: Address): `0x${string}` {
+  // ABI encode addMember call
+  return '0x' as `0x${string}`;
+}
+
+export function encodeRemoveMember(councilId: `0x${string}`, member: Address): `0x${string}` {
+  // ABI encode removeMember call  
+  return '0x' as `0x${string}`;
+}
+
+export function encodeReassignAgent(agentId: bigint, newCouncilId: `0x${string}`): `0x${string}` {
+  // ABI encode reassignAgentCouncil call
+  return '0x' as `0x${string}`;
+}
+
+// ============================================================================
+// Health Check
+// ============================================================================
+
+export async function healthCheck(): Promise<boolean> {
+  try {
+    await getSafeInfo();
+    return true;
+  } catch {
+    return false;
+  }
+}

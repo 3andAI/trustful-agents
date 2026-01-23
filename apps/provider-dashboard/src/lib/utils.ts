@@ -66,7 +66,7 @@ export function shortenHash(hash: string, chars = 6): string {
 }
 
 /**
- * Format timestamp to readable date
+ * Format timestamp to readable date in UTC
  */
 export function formatTimestamp(timestamp: bigint, options?: { relative?: boolean }): string {
   if (timestamp === BigInt(0)) return 'Never'
@@ -95,7 +95,8 @@ export function formatTimestamp(timestamp: bigint, options?: { relative?: boolea
     }
   }
   
-  return date.toLocaleString()
+  // Format in UTC
+  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC')
 }
 
 /**
@@ -141,6 +142,20 @@ export function getWithdrawalTimeRemaining(initiatedAt: bigint): {
   const minutes = Math.floor((remaining % 3600) / 60)
   
   return { days, hours, minutes, total: remaining }
+}
+
+/**
+ * Format time remaining as readable string
+ */
+export function formatTimeRemaining(time: { days: number; hours: number; minutes: number; total: number }): string {
+  if (time.total === 0) return 'Ready'
+  
+  const parts: string[] = []
+  if (time.days > 0) parts.push(`${time.days}d`)
+  if (time.hours > 0) parts.push(`${time.hours}h`)
+  if (time.minutes > 0 || parts.length === 0) parts.push(`${time.minutes}m`)
+  
+  return parts.join(' ')
 }
 
 /**

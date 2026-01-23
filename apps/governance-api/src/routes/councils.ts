@@ -20,6 +20,7 @@ import {
   deleteCouncilMember,
   logAuditEvent,
 } from '../services/members.js';
+import { getAllAgents } from '../services/agents.js';
 import { queueEmail, notifyCouncilMembers } from '../services/email.js';
 
 const router = Router();
@@ -107,6 +108,32 @@ const CouncilRegistryABI = [
     stateMutability: 'view',
   },
 ] as const;
+
+// TermsRegistry ABI for getting agent terms
+const TermsRegistryABI = [
+  {
+    type: 'function',
+    name: 'getActiveTerms',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'terms',
+        type: 'tuple',
+        components: [
+          { name: 'contentHash', type: 'bytes32' },
+          { name: 'contentUri', type: 'string' },
+          { name: 'councilId', type: 'bytes32' },
+          { name: 'registeredAt', type: 'uint256' },
+          { name: 'active', type: 'bool' },
+        ],
+      },
+      { name: 'version', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+const TERMS_REGISTRY_ADDRESS = process.env.TERMS_REGISTRY_ADDRESS as Address || '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d' as Address;
 
 // ============================================================================
 // Viem Client
@@ -268,6 +295,118 @@ router.get(
     } catch (error) {
       console.error('Failed to fetch council members:', error);
       res.status(500).json({ error: 'Failed to fetch council members' });
+    }
+  }
+);
+
+/**
+ * GET /councils/:id/agents
+ * Get agents assigned to this council
+ */
+router.get(
+  '/:id/agents',
+  validateParams(councilIdParamSchema),
+  async (req, res: Response) => {
+    try {
+      const councilId = req.params.id as `0x${string}`;
+      const client = getClient();
+      
+      console.log(`Fetching agents for council ${councilId}`);
+      
+      // Get total supply of agents from ERC8004Registry
+      const ERC8004_REGISTRY = process.env.ERC8004_REGISTRY_ADDRESS as Address || '0xb3B4b5042Fd3600404846671Ff5558719860b694' as Address;
+      
+      const ERC8004ABI = [
+        {
+          type: 'function',
+          name: 'totalSupply',
+          inputs: [],
+          outputs: [{ name: '', type: 'uint256' }],
+          stateMutability: 'view',
+        },
+        {
+          type: 'function',
+          name: 'ownerOf',
+          inputs: [{ name: 'tokenId', type: 'uint256' }],
+          outputs: [{ name: '', type: 'address' }],
+          stateMutability: 'view',
+        },
+      ] as const;
+      
+      const totalSupply = await client.readContract({
+        address: ERC8004_REGISTRY,
+        abi: ERC8004ABI,
+        functionName: 'totalSupply',
+      });
+      
+      console.log(`Total agents: ${totalSupply}`);
+      
+      // Get DB metadata for all agents (for names)
+      const allAgentsMetadata = await getAllAgents();
+      const metadataMap = new Map(allAgentsMetadata.map(a => [a.agent_id, a]));
+      
+      // Check each agent's council assignment
+      const assignedAgents: Array<{
+        agentId: string;
+        name: string;
+        description: string | null;
+        ownerAddress: string;
+      }> = [];
+      
+      // Iterate through all agent IDs (1 to totalSupply, assuming 1-indexed)
+      for (let i = 1; i <= Number(totalSupply); i++) {
+        try {
+          // Get terms for this agent
+          const result = await client.readContract({
+            address: TERMS_REGISTRY_ADDRESS,
+            abi: TermsRegistryABI,
+            functionName: 'getActiveTerms',
+            args: [BigInt(i)],
+          }) as [{ contentHash: string; contentUri: string; councilId: string; registeredAt: bigint; active: boolean }, bigint];
+          
+          const terms = result[0];
+          
+          console.log(`Agent ${i}: active=${terms.active}, councilId=${terms.councilId}`);
+          
+          if (terms.active && terms.councilId.toLowerCase() === councilId.toLowerCase()) {
+            // Get owner
+            let ownerAddress = '';
+            try {
+              ownerAddress = await client.readContract({
+                address: ERC8004_REGISTRY,
+                abi: ERC8004ABI,
+                functionName: 'ownerOf',
+                args: [BigInt(i)],
+              });
+            } catch {
+              ownerAddress = 'unknown';
+            }
+            
+            const metadata = metadataMap.get(String(i));
+            
+            assignedAgents.push({
+              agentId: String(i),
+              name: metadata?.name ?? `Agent #${i}`,
+              description: metadata?.description ?? null,
+              ownerAddress: ownerAddress,
+            });
+          }
+        } catch (err) {
+          // Agent may not have terms registered, skip
+          console.log(`Agent ${i}: no terms or error`);
+        }
+      }
+      
+      console.log(`Found ${assignedAgents.length} agents for council ${councilId}`);
+      
+      res.json({
+        councilId,
+        agents: assignedAgents,
+        count: assignedAgents.length,
+      });
+    } catch (error) {
+      console.error('Failed to fetch council agents:', error);
+      res.status(500).json({ error: 'Failed to fetch council agents' });
     }
   }
 );

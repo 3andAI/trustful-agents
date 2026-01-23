@@ -1,0 +1,94 @@
+[
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimFiled",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "claimant", "type": "address", "indexed": true },
+      { "name": "claimedAmount", "type": "uint256", "indexed": false },
+      { "name": "claimantDeposit", "type": "uint256", "indexed": false },
+      { "name": "councilId", "type": "bytes32", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "EvidenceSubmitted",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "evidenceHash", "type": "bytes32", "indexed": false },
+      { "name": "evidenceUri", "type": "string", "indexed": false },
+      { "name": "isCounterEvidence", "type": "bool", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "VoteCast",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "voter", "type": "address", "indexed": true },
+      { "name": "vote", "type": "uint8", "indexed": false },
+      { "name": "approvedAmount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "VoteChanged",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "voter", "type": "address", "indexed": true },
+      { "name": "oldVote", "type": "uint8", "indexed": false },
+      { "name": "newVote", "type": "uint8", "indexed": false },
+      { "name": "oldApprovedAmount", "type": "uint256", "indexed": false },
+      { "name": "newApprovedAmount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimApproved",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "approvedAmount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimRejected",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimCancelled",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "depositForfeited", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimExpired",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "hadVotes", "type": "bool", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ClaimExecuted",
+    "inputs": [
+      { "name": "claimId", "type": "uint256", "indexed": true },
+      { "name": "amountPaid", "type": "uint256", "indexed": false }
+    ]
+  }
+]

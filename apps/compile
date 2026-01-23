@@ -1,0 +1,12 @@
+#!/bin/sh
+cd governance-dashboard
+npm run build
+cd ../governance-api
+npm run build
+cd ../provider-dashboard
+npm run build
+cd ../council-dashboard
+npm run build
+cd ../claimer-dashboard
+npm run build
+cd ..

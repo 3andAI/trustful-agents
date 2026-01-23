@@ -166,6 +166,19 @@ export async function getCouncilMembers(
   return apiRequest(`/councils/${councilId}/members`);
 }
 
+export interface CouncilAgent {
+  agentId: string;
+  name: string;
+  description: string | null;
+  ownerAddress: string;
+}
+
+export async function getCouncilAgents(
+  councilId: string
+): Promise<{ councilId: string; agents: CouncilAgent[]; count: number }> {
+  return apiRequest(`/councils/${councilId}/agents`);
+}
+
 export async function canCloseCouncil(
   councilId: string
 ): Promise<{ canClose: boolean; reason: string }> {
@@ -297,4 +310,18 @@ export async function syncPendingTransactions(): Promise<{
   updated: number;
 }> {
   return apiRequest('/pending/sync', { method: 'POST' });
+}
+
+// ============================================================================
+// Agent Endpoints
+// ============================================================================
+
+export async function proposeReassignAgent(params: {
+  agentId: string;
+  newCouncilId: string;
+}): Promise<ProposeResponse & { details: { agentId: string; fromCouncilId: string; toCouncilId: string; toCouncilName: string } }> {
+  return apiRequest('/agents/propose-reassign', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
 }

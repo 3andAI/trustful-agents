@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useAccount, useReadContract, useReadContracts } from 'wagmi'
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { CONTRACTS, Erc8004RegistryAbi, CollateralVaultAbi, TrustfulValidatorAbi } from '../config/contracts'
 import type { Agent, AgentWithDetails, CollateralAccount, ValidationConditions } from '../types'
 
@@ -160,5 +160,32 @@ export function useAgentOwner(agentId: string | undefined) {
     owner: owner as `0x${string}` | undefined,
     isLoading,
     exists: !error && !!owner,
+  }
+}
+
+/**
+ * Hook to request validation for an agent
+ */
+export function useRequestValidation() {
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+
+  const requestValidation = (agentId: string) => {
+    writeContract({
+      address: CONTRACTS.trustfulValidator,
+      abi: TrustfulValidatorAbi,
+      functionName: 'requestValidation',
+      args: [BigInt(agentId)],
+    })
+  }
+
+  return {
+    requestValidation,
+    hash,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+    reset,
   }
 }

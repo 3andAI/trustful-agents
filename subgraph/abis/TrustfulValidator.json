@@ -1,0 +1,42 @@
+[
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ValidationIssued",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "requestHash", "type": "bytes32", "indexed": true },
+      { "name": "nonce", "type": "uint256", "indexed": false },
+      { "name": "responseUri", "type": "string", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ValidationRevoked",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "requestHash", "type": "bytes32", "indexed": true },
+      { "name": "reason", "type": "uint8", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ValidationConditionsChanged",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      {
+        "name": "conditions",
+        "type": "tuple",
+        "indexed": false,
+        "components": [
+          { "name": "hasMinimumCollateral", "type": "bool" },
+          { "name": "hasActiveTerms", "type": "bool" },
+          { "name": "isOwnerValid", "type": "bool" },
+          { "name": "councilIsActive", "type": "bool" }
+        ]
+      }
+    ]
+  }
+]

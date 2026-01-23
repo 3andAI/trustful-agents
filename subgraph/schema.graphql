@@ -5,7 +5,7 @@
 # -----------------------------------------------------------------------------
 # Agent Entity - Core identity with trust info
 # -----------------------------------------------------------------------------
-type Agent @entity {
+type Agent @entity(immutable: false) {
   id: ID!                           # ERC-8004 token ID (hex)
   owner: Bytes!                     # Current owner address
   
@@ -53,7 +53,7 @@ type Agent @entity {
 # -----------------------------------------------------------------------------
 # Terms Version - T&C history per agent
 # -----------------------------------------------------------------------------
-type TermsVersion @entity {
+type TermsVersion @entity(immutable: false) {
   id: ID!                           # agentId-version
   agent: Agent!
   version: Int!
@@ -71,7 +71,7 @@ type TermsVersion @entity {
 # -----------------------------------------------------------------------------
 # Council - Dispute resolution body
 # -----------------------------------------------------------------------------
-type Council @entity {
+type Council @entity(immutable: false) {
   id: ID!                           # councilId (bytes32 hex)
   name: String!
   vertical: String!
@@ -102,7 +102,7 @@ type Council @entity {
 # -----------------------------------------------------------------------------
 # Council Member
 # -----------------------------------------------------------------------------
-type CouncilMember @entity {
+type CouncilMember @entity(immutable: false) {
   id: ID!                           # councilId-memberAddress
   council: Council!
   member: Bytes!
@@ -123,7 +123,7 @@ type CouncilMember @entity {
 # -----------------------------------------------------------------------------
 # Claim - Dispute filed against an agent
 # -----------------------------------------------------------------------------
-type Claim @entity {
+type Claim @entity(immutable: false) {
   id: ID!                           # claimId (numeric)
   agent: Agent!
   council: Council!
@@ -173,12 +173,13 @@ enum ClaimStatus {
   Rejected
   Executed
   Cancelled
+  Expired
 }
 
 # -----------------------------------------------------------------------------
 # Evidence - Additional evidence for claims
 # -----------------------------------------------------------------------------
-type Evidence @entity {
+type Evidence @entity(immutable: true) {
   id: ID!                           # claimId-index
   claim: Claim!
   
@@ -193,7 +194,7 @@ type Evidence @entity {
 # -----------------------------------------------------------------------------
 # Vote - Council member vote on claim
 # -----------------------------------------------------------------------------
-type Vote @entity {
+type Vote @entity(immutable: false) {
   id: ID!                           # claimId-voterAddress
   claim: Claim!
   voter: CouncilMember!
@@ -214,7 +215,7 @@ enum VoteType {
 # -----------------------------------------------------------------------------
 # Deposit - Collateral deposit event
 # -----------------------------------------------------------------------------
-type Deposit @entity {
+type Deposit @entity(immutable: true) {
   id: ID!                           # txHash-logIndex
   agent: Agent!
   
@@ -228,7 +229,7 @@ type Deposit @entity {
 # -----------------------------------------------------------------------------
 # Withdrawal - Withdrawal event
 # -----------------------------------------------------------------------------
-type Withdrawal @entity {
+type Withdrawal @entity(immutable: false) {
   id: ID!                           # txHash-logIndex
   agent: Agent!
   
@@ -245,7 +246,7 @@ type Withdrawal @entity {
 # -----------------------------------------------------------------------------
 # Validation Event - Track validation changes
 # -----------------------------------------------------------------------------
-type ValidationEvent @entity {
+type ValidationEvent @entity(immutable: true) {
   id: ID!                           # txHash-logIndex
   agent: Agent!
   
@@ -265,7 +266,7 @@ enum ValidationEventType {
 # -----------------------------------------------------------------------------
 # Protocol Statistics - Aggregate metrics
 # -----------------------------------------------------------------------------
-type ProtocolStats @entity {
+type ProtocolStats @entity(immutable: false) {
   id: ID!                           # "global"
   
   totalAgents: Int!

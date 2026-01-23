@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
 import { Bot, Plus, Download, ArrowRight, Check } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, Button, Input, Alert, Tabs } from '../components/ui'
-import { CONTRACTS, Erc8004RegistryAbi } from '../config/contracts'
+import { CONTRACTS, Erc8004RegistryAbi, API_BASE_URL } from '../config/contracts'
 import { useAgentOwner } from '../hooks/useAgents'
 
 type Tab = 'mint' | 'import'
@@ -37,6 +37,10 @@ function MintAgentForm() {
   const { address } = useAccount()
   const [mintedId, setMintedId] = useState<bigint | null>(null)
   const [expectedId, setExpectedId] = useState<bigint | null>(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false)
+  const [metadataError, setMetadataError] = useState<string | null>(null)
   
   const { writeContract, data: hash, isPending, error: writeError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
@@ -47,14 +51,50 @@ function MintAgentForm() {
     functionName: 'nextTokenId',
   })
 
+  // After mint succeeds, save metadata to API
   useEffect(() => {
-    if (isSuccess && expectedId !== null) {
-      setMintedId(expectedId)
+    async function saveMetadata() {
+      if (isSuccess && expectedId !== null && address && name) {
+        setIsSavingMetadata(true)
+        setMetadataError(null)
+        try {
+          // Wait for blockchain state to propagate before checking ownership
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          
+          const response = await fetch(API_BASE_URL + '/provider/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agentId: expectedId.toString(),
+              ownerAddress: address,
+              name: name.trim(),
+              description: description.trim() || undefined,
+            }),
+          })
+          if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to save agent metadata')
+          }
+          setMintedId(expectedId)
+        } catch (err) {
+          console.error('Failed to save metadata:', err)
+          setMetadataError(err instanceof Error ? err.message : 'Failed to save metadata')
+          // Still show success since the NFT was minted
+          setMintedId(expectedId)
+        } finally {
+          setIsSavingMetadata(false)
+        }
+      }
     }
-  }, [isSuccess, expectedId])
+    saveMetadata()
+  }, [isSuccess, expectedId, address, name, description])
 
   const handleMint = () => {
     if (!address || nextTokenId === undefined) return
+    if (!name.trim()) {
+      setMetadataError('Please enter a name for your agent')
+      return
+    }
     // Capture the ID BEFORE minting
     setExpectedId(nextTokenId)
     writeContract({
@@ -73,7 +113,10 @@ function MintAgentForm() {
             <Check className="w-8 h-8 text-success" />
           </div>
           <h3 className="text-xl font-semibold text-surface-100 mb-2">Agent Created!</h3>
-          <p className="text-surface-400 mb-6">Your new agent has been minted with ID #{mintedId.toString()}</p>
+          <p className="text-surface-400 mb-2">Your agent "{name}" has been minted with ID #{mintedId.toString()}</p>
+          {metadataError && (
+            <p className="text-warning text-sm mb-4">Note: {metadataError}</p>
+          )}
           <Button onClick={() => navigate(`/agents/${mintedId}`)}>
             Go to Agent <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
@@ -97,6 +140,30 @@ function MintAgentForm() {
       </CardHeader>
 
       <div className="mt-6 space-y-6">
+        <Input
+          label="Agent Name"
+          placeholder="e.g., My Trading Bot"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          hint="A recognizable name for your agent"
+        />
+
+        <div>
+          <label className="block text-sm font-medium text-surface-200 mb-2">
+            Description <span className="text-surface-500">(optional)</span>
+          </label>
+          <textarea
+            className="w-full px-4 py-3 rounded-lg bg-surface-800 border border-surface-700 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+            rows={3}
+            placeholder="Describe what your agent does..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
+          />
+          <p className="text-xs text-surface-500 mt-1">{description.length}/2000 characters</p>
+        </div>
+
         <div className="p-4 bg-surface-800/50 rounded-lg">
           <p className="text-sm text-surface-400 mb-2">Preview</p>
           <div className="flex items-center gap-4">
@@ -104,7 +171,7 @@ function MintAgentForm() {
               <Bot className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <p className="font-medium text-surface-100">Agent #{nextTokenId?.toString() ?? '...'}</p>
+              <p className="font-medium text-surface-100">{name || `Agent #${nextTokenId?.toString() ?? '...'}`}</p>
               <p className="text-sm text-surface-500">
                 Owner: {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '...'}
               </p>
@@ -117,14 +184,20 @@ function MintAgentForm() {
           You can then deposit collateral and register terms to get validated.
         </Alert>
 
-        {writeError && (
-          <Alert variant="danger" title="Transaction Failed">
-            {writeError.message}
+        {(writeError || metadataError) && (
+          <Alert variant="danger" title="Error">
+            {writeError?.message || metadataError}
           </Alert>
         )}
 
-        <Button onClick={handleMint} loading={isPending || isConfirming} className="w-full" size="lg">
-          {isPending ? 'Confirm in wallet...' : isConfirming ? 'Minting...' : 'Mint Agent'}
+        <Button 
+          onClick={handleMint} 
+          loading={isPending || isConfirming || isSavingMetadata} 
+          disabled={!name.trim()}
+          className="w-full" 
+          size="lg"
+        >
+          {isPending ? 'Confirm in wallet...' : isConfirming ? 'Minting...' : isSavingMetadata ? 'Saving...' : 'Mint Agent'}
         </Button>
       </div>
     </Card>

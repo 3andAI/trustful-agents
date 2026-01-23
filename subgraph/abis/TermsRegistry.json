@@ -1,0 +1,41 @@
+[
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "TermsRegistered",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "version", "type": "uint256", "indexed": true },
+      { "name": "contentHash", "type": "bytes32", "indexed": false },
+      { "name": "contentUri", "type": "string", "indexed": false },
+      { "name": "councilId", "type": "bytes32", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "TermsActivated",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "version", "type": "uint256", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "TermsDeactivated",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "version", "type": "uint256", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "TermsInvalidated",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "indexed": true },
+      { "name": "reason", "type": "string", "indexed": false }
+    ]
+  }
+]
