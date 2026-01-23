@@ -1,22 +1,60 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   History as HistoryIcon, 
   CheckCircle, 
   XCircle, 
   MinusCircle,
   Loader2,
+  TrendingUp,
+  Coins,
 } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
-import { useMemberPendingClaims } from '../hooks/useClaims';
 import { formatUSDC } from '../lib/api';
+import { getVoterStats, type SubgraphVote } from '../lib/subgraph';
+
+// Format USDC from BigInt
+function formatUSDCBigInt(amount: bigint): string {
+  const dollars = Number(amount) / 1_000_000;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(dollars);
+}
+
+// Get vote type label
+function getVoteLabel(vote: number): string {
+  switch (vote) {
+    case 1: return 'Approved';
+    case 2: return 'Rejected';
+    case 3: return 'Abstained';
+    default: return 'Unknown';
+  }
+}
+
+// Get vote icon
+function VoteIcon({ vote }: { vote: number }) {
+  switch (vote) {
+    case 1: return <CheckCircle className="w-5 h-5 text-accent" />;
+    case 2: return <XCircle className="w-5 h-5 text-danger" />;
+    case 3: return <MinusCircle className="w-5 h-5 text-governance-400" />;
+    default: return null;
+  }
+}
 
 export default function HistoryPage() {
   const { address } = useWallet();
-  const { data: claimsData, isLoading } = useMemberPendingClaims(address);
   
-  // For now, we show voted claims from pending claims
-  // In production, this would query historical data from a subgraph
-  const votedClaims = claimsData?.claims.filter(c => c.hasVoted) ?? [];
+  // Fetch voter stats from subgraph
+  const { data: stats, isLoading, error } = useQuery({
+    queryKey: ['voterStats', address],
+    queryFn: () => getVoterStats(address!),
+    enabled: !!address,
+    staleTime: 60000, // 1 minute
+    refetchInterval: 120000, // 2 minutes
+  });
 
   return (
     <div className="space-y-6">
@@ -31,36 +69,72 @@ export default function HistoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card p-4">
-          <p className="text-sm text-governance-500">Total Votes Cast</p>
-          <p className="text-2xl font-bold text-governance-100 mt-1">
-            {isLoading ? '—' : votedClaims.length}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-governance-500">Total Votes Cast</p>
+              <p className="text-2xl font-bold text-governance-100 mt-1">
+                {isLoading ? '—' : stats?.totalVotes ?? 0}
+              </p>
+              {stats && (
+                <p className="text-xs text-governance-500 mt-1">
+                  {stats.approveVotes} approve • {stats.rejectVotes} reject • {stats.abstainVotes} abstain
+                </p>
+              )}
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-council/20 flex items-center justify-center">
+              <HistoryIcon className="w-5 h-5 text-council" />
+            </div>
+          </div>
         </div>
+        
         <div className="card p-4">
-          <p className="text-sm text-governance-500">Deposit Earnings</p>
-          <p className="text-2xl font-bold text-accent mt-1">
-            Coming Soon
-          </p>
-          <p className="text-xs text-governance-500 mt-1">Requires subgraph</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-governance-500">Deposit Earnings</p>
+              <p className="text-2xl font-bold text-accent mt-1">
+                {isLoading ? '—' : stats ? formatUSDCBigInt(stats.depositEarnings) : '$0.00'}
+              </p>
+              <p className="text-xs text-governance-500 mt-1">From finalized claims</p>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
+              <Coins className="w-5 h-5 text-accent" />
+            </div>
+          </div>
         </div>
+        
         <div className="card p-4">
-          <p className="text-sm text-governance-500">Win Rate</p>
-          <p className="text-2xl font-bold text-governance-100 mt-1">
-            Coming Soon
-          </p>
-          <p className="text-xs text-governance-500 mt-1">Requires subgraph</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-governance-500">Win Rate</p>
+              <p className="text-2xl font-bold text-governance-100 mt-1">
+                {isLoading ? '—' : stats ? `${stats.winRate}%` : '—'}
+              </p>
+              <p className="text-xs text-governance-500 mt-1">Votes matching outcome</p>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-council/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-council" />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* History List */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-governance-100 mb-4">Recent Votes</h2>
+        <h2 className="text-lg font-semibold text-governance-100 mb-4">Vote History</h2>
         
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-council" />
           </div>
-        ) : votedClaims.length === 0 ? (
+        ) : error ? (
+          <div className="text-center py-12">
+            <HistoryIcon className="w-12 h-12 text-danger mx-auto mb-3" />
+            <p className="text-governance-300">Failed to load voting history</p>
+            <p className="text-governance-500 text-sm mt-1">
+              {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+          </div>
+        ) : !stats || stats.votes.length === 0 ? (
           <div className="text-center py-12">
             <HistoryIcon className="w-12 h-12 text-governance-600 mx-auto mb-3" />
             <p className="text-governance-300">No voting history yet</p>
@@ -73,47 +147,11 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {votedClaims.map((claim) => (
-              <Link
-                key={claim.claimId}
-                to={`/claims/${claim.claimId}`}
-                className="flex items-center justify-between p-4 bg-governance-800/50 rounded-lg hover:bg-governance-800 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-accent" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-governance-100">
-                      Claim #{claim.claimId}
-                    </p>
-                    <p className="text-sm text-governance-400">
-                      Agent #{claim.agentId} • {formatUSDC(claim.claimedAmount)}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-sm ${
-                    claim.status === 'Approved' ? 'text-accent' :
-                    claim.status === 'Rejected' ? 'text-danger' :
-                    'text-governance-400'
-                  }`}>
-                    {claim.status}
-                  </span>
-                </div>
-              </Link>
+            {stats.votes.map((vote) => (
+              <VoteHistoryItem key={vote.id} vote={vote} />
             ))}
           </div>
         )}
-
-        {/* Note about full history */}
-        <div className="mt-6 p-4 bg-governance-800/30 rounded-lg border border-governance-700">
-          <p className="text-sm text-governance-400">
-            <strong className="text-governance-300">Note:</strong> Full voting history including 
-            resolved claims and deposit earnings will be available once the subgraph is deployed. 
-            Currently showing only pending claims where you've voted.
-          </p>
-        </div>
       </div>
 
       {/* Help Section */}
@@ -126,7 +164,7 @@ export default function HistoryPage() {
             </div>
             <h3 className="font-medium text-governance-100">Approve</h3>
             <p className="text-sm text-governance-400">
-              Vote to approve the claim and specify the compensation amount. The median of all approval amounts becomes the final payout.
+              Vote to approve the claim. If approved, the claimant receives the claimed amount from the agent's collateral.
             </p>
           </div>
           <div className="space-y-2">
@@ -152,12 +190,55 @@ export default function HistoryPage() {
         <div className="mt-6 pt-6 border-t border-governance-800">
           <h3 className="font-medium text-governance-100 mb-2">Deposit Distribution</h3>
           <p className="text-sm text-governance-400">
-            Claimant deposits are always distributed to council members who voted (except abstentions). 
+            Claimant deposits are distributed to council members who voted (except abstentions) once a claim is finalized. 
             This happens regardless of the outcome—even if the claim is approved, voters receive their 
             share of the deposit as compensation for their time and judgment.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+// Vote history item component
+function VoteHistoryItem({ vote }: { vote: SubgraphVote }) {
+  const claim = vote.claim;
+  
+  return (
+    <Link
+      to={`/claims/${claim.id}`}
+      className="flex items-center justify-between p-4 bg-governance-800/50 rounded-lg hover:bg-governance-800 transition-colors"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 rounded-lg bg-governance-700/50 flex items-center justify-center">
+          <VoteIcon vote={vote.vote} />
+        </div>
+        <div>
+          <p className="font-medium text-governance-100">
+            Claim #{claim.id}
+          </p>
+          <p className="text-sm text-governance-400">
+            {formatUSDC(claim.claimedAmount)} • You {getVoteLabel(vote.vote).toLowerCase()}
+          </p>
+          {vote.reasoning && (
+            <p className="text-xs text-governance-500 mt-1 italic">
+              "{vote.reasoning.slice(0, 50)}{vote.reasoning.length > 50 ? '...' : ''}"
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="text-right">
+        <span className={`text-sm font-medium ${
+          claim.status === 'Approved' || claim.status === 'Executed' ? 'text-accent' :
+          claim.status === 'Rejected' ? 'text-danger' :
+          'text-governance-400'
+        }`}>
+          {claim.status}
+        </span>
+        <p className="text-xs text-governance-500 mt-1">
+          {new Date(parseInt(vote.votedAt) * 1000).toLocaleDateString()}
+        </p>
+      </div>
+    </Link>
   );
 }
