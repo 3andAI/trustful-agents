@@ -189,6 +189,33 @@ contract CouncilRegistryMock {
     }
 
     /**
+     * @notice Get active (non-suspended) council members
+     * @dev [v1.3] New function for RulingExecutor deposit distribution
+     */
+    function getActiveCouncilMembers(bytes32 councilId) external view returns (address[] memory) {
+        address[] memory allMembers = _councilMembers[councilId];
+        
+        // Count active members
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < allMembers.length; i++) {
+            if (_members[councilId][allMembers[i]].active && !_members[councilId][allMembers[i]].suspended) {
+                activeCount++;
+            }
+        }
+        
+        // Build active members array
+        address[] memory activeMembers = new address[](activeCount);
+        uint256 j = 0;
+        for (uint256 i = 0; i < allMembers.length; i++) {
+            if (_members[councilId][allMembers[i]].active && !_members[councilId][allMembers[i]].suspended) {
+                activeMembers[j++] = allMembers[i];
+            }
+        }
+        
+        return activeMembers;
+    }
+
+    /**
      * @notice Get active member count
      */
     function getActiveMemberCount(bytes32 councilId) external view returns (uint256) {

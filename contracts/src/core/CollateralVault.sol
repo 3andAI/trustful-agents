@@ -216,7 +216,15 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         // Clear withdrawal state
         account.withdrawalInitiatedAt = 0;
         account.withdrawalAmount = 0;
-        account.balance -= amount;
+        
+        // [v1.3] Add underflow protection (defensive - should never trigger)
+        if (account.balance >= amount) {
+            account.balance -= amount;
+        } else {
+            // This shouldn't happen, but cap withdrawal to actual balance
+            amount = account.balance;
+            account.balance = 0;
+        }
 
         address recipient = _getAgentOwner(agentId);
         _USDC.safeTransfer(recipient, amount);
@@ -268,8 +276,19 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         uint256 actualUnlock = amount > lockedForClaim ? lockedForClaim : amount;
 
         if (actualUnlock > 0) {
-            account.lockedAmount -= actualUnlock;
-            _lockedByClaim[agentId][claimId] -= actualUnlock;
+            // [v1.3] Add underflow protection
+            if (account.lockedAmount >= actualUnlock) {
+                account.lockedAmount -= actualUnlock;
+            } else {
+                account.lockedAmount = 0;
+            }
+            
+            // [v1.3] Add underflow protection for per-claim tracking
+            if (_lockedByClaim[agentId][claimId] >= actualUnlock) {
+                _lockedByClaim[agentId][claimId] -= actualUnlock;
+            } else {
+                _lockedByClaim[agentId][claimId] = 0;
+            }
 
             emit CollateralUnlocked(agentId, claimId, actualUnlock);
         }
@@ -293,9 +312,27 @@ contract CollateralVault is ICollateralVault, TrustfulPausable, ReentrancyGuard 
         uint256 actualSlash = amount > lockedForClaim ? lockedForClaim : amount;
 
         if (actualSlash > 0) {
-            account.lockedAmount -= actualSlash;
-            account.balance -= actualSlash;
-            _lockedByClaim[agentId][claimId] -= actualSlash;
+            // [v1.3] Add underflow protection for all decrements
+            if (account.lockedAmount >= actualSlash) {
+                account.lockedAmount -= actualSlash;
+            } else {
+                account.lockedAmount = 0;
+            }
+            
+            if (account.balance >= actualSlash) {
+                account.balance -= actualSlash;
+            } else {
+                // This shouldn't happen, but protect against it
+                actualSlash = account.balance;
+                account.balance = 0;
+            }
+            
+            // [v1.3] Add underflow protection for per-claim tracking
+            if (_lockedByClaim[agentId][claimId] >= actualSlash) {
+                _lockedByClaim[agentId][claimId] -= actualSlash;
+            } else {
+                _lockedByClaim[agentId][claimId] = 0;
+            }
 
             _USDC.safeTransfer(recipient, actualSlash);
 

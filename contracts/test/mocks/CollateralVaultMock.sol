@@ -60,7 +60,7 @@ contract CollateralVaultMock {
     /**
      * @notice Lock collateral for a claim
      */
-    function lock(uint256 agentId, uint256 claimId, uint256 amount) external returns (bool) {
+    function lock(uint256 agentId, uint256 claimId, uint256 amount) external returns (uint256) {
         lockCallCount++;
         lastLockAgentId = agentId;
         lastLockClaimId = claimId;
@@ -68,13 +68,13 @@ contract CollateralVaultMock {
         
         _claimLocks[agentId][claimId] = amount;
         _lockedAmounts[agentId] += amount;
-        return true;
+        return amount; // Return actual locked amount
     }
 
     /**
      * @notice Unlock collateral from a claim
      */
-    function unlock(uint256 agentId, uint256 claimId, uint256 amount) external returns (bool) {
+    function unlock(uint256 agentId, uint256 claimId, uint256 amount) external {
         unlockCallCount++;
         
         uint256 locked = _claimLocks[agentId][claimId];
@@ -82,13 +82,12 @@ contract CollateralVaultMock {
         
         _claimLocks[agentId][claimId] -= amount;
         _lockedAmounts[agentId] -= amount;
-        return true;
     }
 
     /**
      * @notice Slash collateral and transfer to recipient
      */
-    function slash(uint256 agentId, uint256 claimId, address recipient, uint256 amount) external returns (bool) {
+    function slash(uint256 agentId, uint256 claimId, address recipient, uint256 amount) external {
         slashCallCount++;
         
         // Use claim lock if set, otherwise use deposit directly (for simpler testing)
@@ -106,7 +105,6 @@ contract CollateralVaultMock {
         
         // Transfer USDC to recipient
         usdc.transfer(recipient, amount);
-        return true;
     }
 
     // =========================================================================

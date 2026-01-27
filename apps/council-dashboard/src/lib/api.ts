@@ -148,7 +148,7 @@ export async function prepareVoteTransaction(
 
 export async function prepareFinalizeTransaction(
   claimId: string
-): Promise<{ transaction: TransactionData; message: string }> {
+): Promise<{ transaction: TransactionData; step: 'finalize' | 'execute'; message: string }> {
   return apiRequest(`/claims/${claimId}/finalize`, {
     method: 'POST',
   });

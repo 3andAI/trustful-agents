@@ -152,6 +152,12 @@ contract TermsRegistry is ITermsRegistry, TrustfulPausable, ReentrancyGuard {
             revert NoActiveTerms(agentId);
         }
 
+        // [v1.3] Unregister from council before deactivating
+        if (councilRegistry != address(0)) {
+            bytes32 councilId = _terms[agentId][config.activeVersion].councilId;
+            ICouncilRegistry(councilRegistry).unregisterAgentFromCouncil(councilId);
+        }
+
         // Deactivate current terms
         _terms[agentId][config.activeVersion].active = false;
         emit TermsDeactivated(agentId, config.activeVersion);
@@ -269,6 +275,7 @@ contract TermsRegistry is ITermsRegistry, TrustfulPausable, ReentrancyGuard {
      * @param contentUri The content URI
      * @param councilId The council ID
      * @return version The new version number
+     * @dev [v1.3] Added council registration/unregistration for agent count tracking
      */
     function _createTermsVersion(
         uint256 agentId,
@@ -277,6 +284,12 @@ contract TermsRegistry is ITermsRegistry, TrustfulPausable, ReentrancyGuard {
         bytes32 councilId
     ) internal returns (uint256 version) {
         TermsConfig storage config = _configs[agentId];
+
+        // [v1.3] Handle council registration changes
+        bytes32 oldCouncilId = bytes32(0);
+        if (config.activeVersion > 0) {
+            oldCouncilId = _terms[agentId][config.activeVersion].councilId;
+        }
 
         // Increment version count
         config.versionCount += 1;
@@ -293,6 +306,19 @@ contract TermsRegistry is ITermsRegistry, TrustfulPausable, ReentrancyGuard {
 
         // Set as active
         config.activeVersion = version;
+
+        // [v1.3] Update council agent counts
+        if (councilRegistry != address(0)) {
+            // If council changed, unregister from old and register with new
+            if (oldCouncilId != bytes32(0) && oldCouncilId != councilId) {
+                ICouncilRegistry(councilRegistry).unregisterAgentFromCouncil(oldCouncilId);
+                ICouncilRegistry(councilRegistry).registerAgentWithCouncil(councilId);
+            } else if (oldCouncilId == bytes32(0)) {
+                // First time registration
+                ICouncilRegistry(councilRegistry).registerAgentWithCouncil(councilId);
+            }
+            // If same council, no changes needed
+        }
 
         emit TermsRegistered(agentId, version, contentHash, contentUri, councilId);
         emit TermsActivated(agentId, version);
@@ -363,4 +389,6 @@ interface IERC8004Registry {
  */
 interface ICouncilRegistry {
     function isCouncilActive(bytes32 councilId) external view returns (bool);
+    function registerAgentWithCouncil(bytes32 councilId) external;
+    function unregisterAgentFromCouncil(bytes32 councilId) external;
 }

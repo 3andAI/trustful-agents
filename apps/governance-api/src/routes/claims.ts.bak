@@ -623,4 +623,289 @@ router.get('/deposit-calculator', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// Claim Metadata Routes
+// ============================================================================
+
+// GET /claims/:claimId/metadata - Get claim metadata (title, description)
+router.get('/:claimId/metadata', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    const result = await db.query(
+      'SELECT claim_id, title, description, created_at, updated_at FROM claim_metadata WHERE claim_id = $1',
+      [claimId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Metadata not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching claim metadata:', error);
+    res.status(500).json({ error: 'Failed to fetch metadata' });
+  }
+});
+
+// POST /claims/:claimId/metadata - Save claim metadata
+router.post('/:claimId/metadata', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    const { title, description } = req.body;
+    
+    if (!description) {
+      return res.status(400).json({ error: 'description is required' });
+    }
+    
+    // Upsert metadata
+    const result = await db.query(
+      `INSERT INTO claim_metadata (claim_id, title, description)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (claim_id) DO UPDATE SET
+         title = EXCLUDED.title,
+         description = EXCLUDED.description,
+         updated_at = NOW()
+       RETURNING *`,
+      [claimId, title || null, description]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error saving claim metadata:', error);
+    res.status(500).json({ error: 'Failed to save metadata' });
+  }
+});
+
+// ============================================================================
+// Claim Conversation Routes
+// ============================================================================
+
+// GET /claims/:claimId/messages - Get all messages for a claim
+router.get('/:claimId/messages', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    const result = await db.query(
+      `SELECT id, claim_id, parent_id, author_address, author_role,
+              content, evidence_hash, evidence_uri, evidence_filename, evidence_size, created_at
+       FROM claim_messages
+       WHERE claim_id = $1
+       ORDER BY created_at ASC`,
+      [claimId]
+    );
+    
+    // Build threaded structure
+    const messages = result.rows;
+    const messageMap = new Map<string, any>();
+    const rootMessages: any[] = [];
+    
+    // First pass: create map of all messages
+    for (const msg of messages) {
+      messageMap.set(msg.id, { ...msg, replies: [] });
+    }
+    
+    // Second pass: build tree structure
+    for (const msg of messages) {
+      const messageWithReplies = messageMap.get(msg.id);
+      if (msg.parent_id && messageMap.has(msg.parent_id)) {
+        messageMap.get(msg.parent_id).replies.push(messageWithReplies);
+      } else {
+        rootMessages.push(messageWithReplies);
+      }
+    }
+    
+    res.json({
+      messages: rootMessages,
+      totalCount: messages.length
+    });
+  } catch (error) {
+    console.error('Error fetching claim messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// POST /claims/:claimId/messages - Add a message to the conversation
+router.post('/:claimId/messages', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    const { 
+      authorAddress, 
+      authorRole, 
+      content, 
+      parentId,
+      evidenceHash,
+      evidenceUri,
+      evidenceFilename,
+      evidenceSize
+    } = req.body;
+    
+    // Validate required fields
+    if (!authorAddress) {
+      return res.status(400).json({ error: 'authorAddress is required' });
+    }
+    if (!authorRole || !['claimer', 'provider', 'councilor'].includes(authorRole)) {
+      return res.status(400).json({ error: 'authorRole must be claimer, provider, or councilor' });
+    }
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'content is required' });
+    }
+    
+    // Validate evidence file size (10KB max)
+    if (evidenceSize && evidenceSize > 10240) {
+      return res.status(400).json({ error: 'Evidence file must be 10KB or less' });
+    }
+    
+    // Councilors cannot submit evidence
+    if (authorRole === 'councilor' && (evidenceHash || evidenceUri)) {
+      return res.status(403).json({ error: 'Councilors cannot submit evidence, only comments' });
+    }
+    
+    // Verify the claim exists and check if evidence period is still open
+    if (!CLAIMS_MANAGER_ADDRESS) {
+      return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
+    }
+    
+    try {
+      const claim = await publicClient.readContract({
+        address: CLAIMS_MANAGER_ADDRESS,
+        abi: claimsManagerABI,
+        functionName: 'getClaim',
+        args: [BigInt(claimId)],
+      }) as any;
+      
+      const now = Math.floor(Date.now() / 1000);
+      const evidenceDeadline = Number(claim.evidenceDeadline);
+      const status = Number(claim.status);
+      
+      // Only allow messages during evidence period (status = Filed = 0)
+      if (status !== 0 || now >= evidenceDeadline) {
+        return res.status(403).json({ 
+          error: 'Conversation is locked. Evidence period has ended.',
+          evidenceDeadline: new Date(evidenceDeadline * 1000).toISOString()
+        });
+      }
+      
+      // Verify author role matches their actual role for this claim
+      const claimantAddress = claim.claimant.toLowerCase();
+      const providerAddress = claim.providerAtClaimTime.toLowerCase();
+      const authorLower = authorAddress.toLowerCase();
+      
+      if (authorRole === 'claimer' && authorLower !== claimantAddress) {
+        return res.status(403).json({ error: 'Only the claimant can post as claimer' });
+      }
+      
+      if (authorRole === 'provider' && authorLower !== providerAddress) {
+        return res.status(403).json({ error: 'Only the provider can post as provider' });
+      }
+      
+      if (authorRole === 'councilor') {
+        // Verify they are a council member
+        const isMember = await publicClient.readContract({
+          address: COUNCIL_REGISTRY_ADDRESS,
+          abi: councilRegistryABI,
+          functionName: 'isActiveMember',
+          args: [claim.councilId, authorAddress as Address],
+        }) as boolean;
+        
+        if (!isMember) {
+          return res.status(403).json({ error: 'Only council members can post as councilor' });
+        }
+      }
+      
+    } catch (contractError) {
+      console.error('Error verifying claim:', contractError);
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+    
+    // Validate parent_id if provided
+    if (parentId) {
+      const parentCheck = await db.query(
+        'SELECT id FROM claim_messages WHERE id = $1 AND claim_id = $2',
+        [parentId, claimId]
+      );
+      if (parentCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Parent message not found' });
+      }
+    }
+    
+    // Insert the message
+    const result = await db.query(
+      `INSERT INTO claim_messages 
+       (claim_id, parent_id, author_address, author_role, content, evidence_hash, evidence_uri, evidence_filename, evidence_size)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        claimId,
+        parentId || null,
+        authorAddress.toLowerCase(),
+        authorRole,
+        content.trim(),
+        evidenceHash || null,
+        evidenceUri || null,
+        evidenceFilename || null,
+        evidenceSize || null
+      ]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error posting message:', error);
+    res.status(500).json({ error: 'Failed to post message' });
+  }
+});
+
+// GET /claims/:claimId/messages/:messageId - Get a single message with its replies
+router.get('/:claimId/messages/:messageId', async (req: Request, res: Response) => {
+  try {
+    const { claimId, messageId } = req.params;
+    
+    // Get the message and all its descendants
+    const result = await db.query(
+      `WITH RECURSIVE message_tree AS (
+         SELECT id, claim_id, parent_id, author_address, author_role,
+                content, evidence_hash, evidence_uri, evidence_filename, evidence_size, created_at, 0 as depth
+         FROM claim_messages
+         WHERE id = $1 AND claim_id = $2
+         
+         UNION ALL
+         
+         SELECT cm.id, cm.claim_id, cm.parent_id, cm.author_address, cm.author_role,
+                cm.content, cm.evidence_hash, cm.evidence_uri, cm.evidence_filename, cm.evidence_size, cm.created_at, mt.depth + 1
+         FROM claim_messages cm
+         INNER JOIN message_tree mt ON cm.parent_id = mt.id
+       )
+       SELECT * FROM message_tree ORDER BY depth, created_at`,
+      [messageId, claimId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    // Build tree structure
+    const messages = result.rows;
+    const messageMap = new Map<string, any>();
+    
+    for (const msg of messages) {
+      messageMap.set(msg.id, { ...msg, replies: [] });
+    }
+    
+    let rootMessage: any = null;
+    for (const msg of messages) {
+      const messageWithReplies = messageMap.get(msg.id);
+      if (msg.id === messageId) {
+        rootMessage = messageWithReplies;
+      } else if (msg.parent_id && messageMap.has(msg.parent_id)) {
+        messageMap.get(msg.parent_id).replies.push(messageWithReplies);
+      }
+    }
+    
+    res.json(rootMessage);
+  } catch (error) {
+    console.error('Error fetching message:', error);
+    res.status(500).json({ error: 'Failed to fetch message' });
+  }
+});
+
 export default router;

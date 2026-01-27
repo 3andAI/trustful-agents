@@ -143,7 +143,7 @@ export function useFinalizeClaim() {
 
   return useMutation({
     mutationFn: async (claimId: string) => {
-      const { transaction, message } = await prepareFinalizeTransaction(claimId);
+      const { transaction, step, message } = await prepareFinalizeTransaction(claimId);
 
       const hash = await sendTransactionAsync({
         to: transaction.to as `0x${string}`,
@@ -151,7 +151,7 @@ export function useFinalizeClaim() {
         value: BigInt(transaction.value),
       });
 
-      return { hash, message };
+      return { hash, step, message };
     },
     onSuccess: (_, claimId) => {
       queryClient.invalidateQueries({ queryKey: ['claim', claimId] });

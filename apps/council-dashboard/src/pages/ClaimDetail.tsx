@@ -433,13 +433,26 @@ export default function ClaimDetailPage() {
             </div>
           )}
 
-          {/* Finalize Button */}
+          {/* Finalize/Execute Button */}
           {claim.canFinalize && (
             <div className="card p-6">
-              <h2 className="text-lg font-semibold text-governance-100 mb-2">Finalize Claim</h2>
-              <p className="text-governance-400 text-sm mb-4">
-                The voting period has ended. Anyone can finalize this claim to execute the ruling.
-              </p>
+              {claim.statusCode <= 2 ? (
+                <>
+                  <h2 className="text-lg font-semibold text-governance-100 mb-2">Finalize Claim</h2>
+                  <p className="text-governance-400 text-sm mb-4">
+                    The voting period has ended. Finalize to determine the outcome based on votes.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-semibold text-governance-100 mb-2">Execute Claim</h2>
+                  <p className="text-governance-400 text-sm mb-4">
+                    {claim.status === 'Approved' 
+                      ? 'Execute to transfer USDC to the claimant and distribute deposits to voters.'
+                      : 'Execute to unlock collateral and distribute deposits to voters.'}
+                  </p>
+                </>
+              )}
               <button
                 onClick={handleFinalize}
                 disabled={finalizeMutation.isPending || txPending}
@@ -448,12 +461,17 @@ export default function ClaimDetailPage() {
                 {finalizeMutation.isPending || txPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Finalizing...
+                    {claim.statusCode <= 2 ? 'Finalizing...' : 'Executing...'}
                   </>
                 ) : (
-                  'Finalize Claim'
+                  claim.statusCode <= 2 ? 'Finalize Claim' : 'Execute & Distribute Funds'
                 )}
               </button>
+              {finalizeMutation.error && (
+                <p className="text-danger text-sm mt-2">
+                  {finalizeMutation.error.message}
+                </p>
+              )}
             </div>
           )}
 

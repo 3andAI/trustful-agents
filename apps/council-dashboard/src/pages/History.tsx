@@ -24,9 +24,21 @@ function formatUSDCBigInt(amount: bigint): string {
   }).format(dollars);
 }
 
+// Normalize vote to number (handles both string "Approve" and number 1)
+function normalizeVote(vote: string | number | undefined | null): number {
+  if (vote === undefined || vote === null) return 0
+  if (typeof vote === 'number') return vote
+  const voteStr = String(vote).toLowerCase()
+  if (voteStr === 'approve' || voteStr === '1') return 1
+  if (voteStr === 'reject' || voteStr === '2') return 2
+  if (voteStr === 'abstain' || voteStr === '3') return 3
+  return 0
+}
+
 // Get vote type label
-function getVoteLabel(vote: number): string {
-  switch (vote) {
+function getVoteLabel(vote: string | number | undefined | null): string {
+  const voteNum = normalizeVote(vote)
+  switch (voteNum) {
     case 1: return 'Approved';
     case 2: return 'Rejected';
     case 3: return 'Abstained';
@@ -35,8 +47,9 @@ function getVoteLabel(vote: number): string {
 }
 
 // Get vote icon
-function VoteIcon({ vote }: { vote: number }) {
-  switch (vote) {
+function VoteIcon({ vote }: { vote: string | number | undefined | null }) {
+  const voteNum = normalizeVote(vote)
+  switch (voteNum) {
     case 1: return <CheckCircle className="w-5 h-5 text-accent" />;
     case 2: return <XCircle className="w-5 h-5 text-danger" />;
     case 3: return <MinusCircle className="w-5 h-5 text-governance-400" />;
@@ -202,7 +215,14 @@ export default function HistoryPage() {
 
 // Vote history item component
 function VoteHistoryItem({ vote }: { vote: SubgraphVote }) {
-  const claim = vote.claim;
+  const claim = vote?.claim;
+  
+  // Guard against missing data
+  if (!claim) {
+    return null;
+  }
+  
+  const voteLabel = getVoteLabel(vote.vote);
   
   return (
     <Link
@@ -218,7 +238,7 @@ function VoteHistoryItem({ vote }: { vote: SubgraphVote }) {
             Claim #{claim.id}
           </p>
           <p className="text-sm text-governance-400">
-            {formatUSDC(claim.claimedAmount)} • You {getVoteLabel(vote.vote).toLowerCase()}
+            {formatUSDC(claim.claimedAmount || '0')} • You {voteLabel.toLowerCase()}
           </p>
           {vote.reasoning && (
             <p className="text-xs text-governance-500 mt-1 italic">
@@ -233,10 +253,10 @@ function VoteHistoryItem({ vote }: { vote: SubgraphVote }) {
           claim.status === 'Rejected' ? 'text-danger' :
           'text-governance-400'
         }`}>
-          {claim.status}
+          {claim.status || 'Unknown'}
         </span>
         <p className="text-xs text-governance-500 mt-1">
-          {new Date(parseInt(vote.votedAt) * 1000).toLocaleDateString()}
+          {vote.votedAt ? new Date(parseInt(vote.votedAt) * 1000).toLocaleDateString() : 'Unknown date'}
         </p>
       </div>
     </Link>

@@ -45,11 +45,10 @@ contract ClaimsManagerTest is Test {
     uint256 public constant CLAIM_AMOUNT = 1000e6; // 1000 USDC
     uint256 public constant DEPOSIT_PERCENTAGE = 10; // 10%
     uint256 public constant VOTING_PERIOD = 7 days;
-    uint256 public constant EVIDENCE_PERIOD = 3 days;
+    uint256 public constant EVIDENCE_PERIOD = 3 days;  // v1.3: Now "discussion period" - evidence handled off-chain
     uint256 public constant QUORUM_PERCENTAGE = 51;
 
-    bytes32 public constant EVIDENCE_HASH = keccak256("evidence");
-    string public constant EVIDENCE_URI = "ipfs://evidence";
+    // v1.3: Evidence removed from on-chain - now stored in database via governance-api
 
     function setUp() public {
         // Deploy mocks
@@ -127,11 +126,10 @@ contract ClaimsManagerTest is Test {
 
     function _fileDefaultClaim() internal returns (uint256 claimId) {
         vm.prank(claimant);
+        // v1.3: fileClaim signature changed - evidence removed
         claimId = claimsManager.fileClaim(
             AGENT_ID,
             CLAIM_AMOUNT,
-            EVIDENCE_HASH,
-            EVIDENCE_URI,
             PAYMENT_RECEIPT_HASH
         );
     }
@@ -199,13 +197,13 @@ contract ClaimsManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ClaimsManager.NoActiveTerms.selector, AGENT_ID));
         vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, EVIDENCE_HASH, EVIDENCE_URI, PAYMENT_RECEIPT_HASH);
+        claimsManager.fileClaim(AGENT_ID, CLAIM_AMOUNT, PAYMENT_RECEIPT_HASH);
     }
 
     function test_FileClaim_RevertsOnAmountBelowMinimum() public {
         vm.expectRevert(abi.encodeWithSelector(ClaimsManager.InsufficientClaimAmount.selector, 100, 1e6));
         vm.prank(claimant);
-        claimsManager.fileClaim(AGENT_ID, 100, EVIDENCE_HASH, EVIDENCE_URI, PAYMENT_RECEIPT_HASH); // 0.0001 USDC
+        claimsManager.fileClaim(AGENT_ID, 100, PAYMENT_RECEIPT_HASH); // 0.0001 USDC
     }
 
     function test_FileClaim_MultipleClaims() public {
@@ -225,55 +223,16 @@ contract ClaimsManagerTest is Test {
     // Evidence Submission Tests
     // =========================================================================
 
-    function test_SubmitAdditionalEvidence_Success() public {
-        uint256 claimId = _fileDefaultClaim();
-        bytes32 newHash = keccak256("additional-evidence");
-        string memory newUri = "ipfs://additional";
-
-        vm.expectEmit(true, false, false, true);
-        emit IClaimsManager.EvidenceSubmitted(claimId, newHash, newUri, false);
-
-        vm.prank(claimant);
-        claimsManager.submitAdditionalEvidence(claimId, newHash, newUri);
-    }
-
-    function test_SubmitAdditionalEvidence_RevertsAfterEvidencePeriod() public {
-        uint256 claimId = _fileDefaultClaim();
-        
-        _skipToVotingPeriod();
-
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.EvidencePeriodEnded.selector, claimId));
-        vm.prank(claimant);
-        claimsManager.submitAdditionalEvidence(claimId, keccak256("late"), "ipfs://late");
-    }
-
-    function test_SubmitAdditionalEvidence_RevertsOnNonClaimant() public {
-        uint256 claimId = _fileDefaultClaim();
-
-        vm.expectRevert(abi.encodeWithSelector(IClaimsManager.NotClaimant.selector, claimId, nonMember));
-        vm.prank(nonMember);
-        claimsManager.submitAdditionalEvidence(claimId, keccak256("wrong"), "ipfs://wrong");
-    }
-
-    function test_SubmitCounterEvidence_Success() public {
-        uint256 claimId = _fileDefaultClaim();
-        bytes32 counterHash = keccak256("counter-evidence");
-        string memory counterUri = "ipfs://counter";
-
-        vm.expectEmit(true, false, false, true);
-        emit IClaimsManager.EvidenceSubmitted(claimId, counterHash, counterUri, true);
-
-        vm.prank(provider);
-        claimsManager.submitCounterEvidence(claimId, counterHash, counterUri);
-    }
-
-    function test_SubmitCounterEvidence_RevertsOnNonProvider() public {
-        uint256 claimId = _fileDefaultClaim();
-
-        vm.expectRevert(abi.encodeWithSelector(ClaimsManager.NotAgentOwner.selector, AGENT_ID, nonMember));
-        vm.prank(nonMember);
-        claimsManager.submitCounterEvidence(claimId, keccak256("wrong"), "ipfs://wrong");
-    }
+    // =========================================================================
+    // v1.3: Evidence Tests REMOVED
+    // Evidence is now handled off-chain via governance-api claim_messages table
+    // The following tests were removed:
+    // - test_SubmitAdditionalEvidence_Success
+    // - test_SubmitAdditionalEvidence_RevertsAfterEvidencePeriod
+    // - test_SubmitAdditionalEvidence_RevertsOnNonClaimant
+    // - test_SubmitCounterEvidence_Success
+    // - test_SubmitCounterEvidence_RevertsOnNonProvider
+    // =========================================================================
 
     // =========================================================================
     // Voting Tests
@@ -569,8 +528,6 @@ contract ClaimsManagerTest is Test {
         claimsManager.fileClaim(
             AGENT_ID,
             CLAIM_AMOUNT,
-            EVIDENCE_HASH,
-            "ipfs://evidence2",
             PAYMENT_RECEIPT_HASH
         );
         assertEq(claimsManager.getPendingClaimCount(AGENT_ID), 2);

@@ -68,14 +68,13 @@ contract ClaimsManagerMock {
 
     function getClaim(uint256 claimId) external view returns (IClaimsManager.Claim memory claim) {
         MockClaim storage c = claims[claimId];
+        // v1.3: evidenceHash and evidenceUri removed from Claim struct
         claim = IClaimsManager.Claim({
             claimId: claimId,
             agentId: c.agentId,
             claimant: c.claimant,
             claimedAmount: c.amount,
             approvedAmount: c.approvedAmount,
-            evidenceHash: bytes32(0),
-            evidenceUri: "",
             paymentReceiptHash: bytes32(0),
             termsHashAtClaimTime: bytes32(0),
             termsVersionAtClaimTime: 0,

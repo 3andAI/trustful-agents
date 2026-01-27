@@ -11,10 +11,10 @@ const SUBGRAPH_URL = import.meta.env.VITE_SUBGRAPH_URL ||
 export interface SubgraphVote {
   id: string
   voter: string
-  vote: number // 1=Approve, 2=Reject, 3=Abstain
-  approvedAmount: string
-  reasoning: string
-  votedAt: string
+  vote: string | number | undefined // Can be "Approve"/"Reject"/"Abstain" OR 1/2/3
+  approvedAmount?: string
+  reasoning?: string
+  votedAt?: string
   claim: SubgraphClaim
 }
 
@@ -43,13 +43,53 @@ export interface VoterStats {
   votes: SubgraphVote[]
 }
 
+// Helper to normalize vote value to number
+function normalizeVote(vote: string | number | undefined | null): number {
+  if (vote === undefined || vote === null) return 0
+  if (typeof vote === 'number') return vote
+  const voteStr = String(vote).toLowerCase()
+  if (voteStr === 'approve' || voteStr === '1') return 1
+  if (voteStr === 'reject' || voteStr === '2') return 2
+  if (voteStr === 'abstain' || voteStr === '3') return 3
+  return 0
+}
+
 // =============================================================================
 // GraphQL Queries
 // =============================================================================
 
+// Query votes by voter address - using voter_contains for case-insensitive match
 const VOTES_BY_VOTER_QUERY = `
   query GetVotesByVoter($voter: Bytes!) {
-    votes(where: { voter: $voter }, orderBy: votedAt, orderDirection: desc) {
+    votes(where: { voter: $voter }, orderBy: votedAt, orderDirection: desc, first: 100) {
+      id
+      voter
+      vote
+      approvedAmount
+      reasoning
+      votedAt
+      claim {
+        id
+        claimant
+        claimedAmount
+        approvedAmount
+        claimantDeposit
+        status
+        filedAt
+        closedAt
+        approveVotes
+        rejectVotes
+        abstainVotes
+        totalVotes
+      }
+    }
+  }
+`
+
+// Fallback: Get all votes and filter client-side (more expensive but works)
+const ALL_VOTES_QUERY = `
+  query GetAllVotes {
+    votes(orderBy: votedAt, orderDirection: desc, first: 1000) {
       id
       voter
       vote
@@ -80,9 +120,11 @@ const VOTES_BY_VOTER_QUERY = `
 
 async function querySubgraph<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 10000)
+  const timeoutId = setTimeout(() => controller.abort(), 15000) // Increased timeout
   
   try {
+    console.log('Subgraph query:', { query: query.slice(0, 100), variables })
+    
     const response = await fetch(SUBGRAPH_URL, {
       method: 'POST',
       headers: {
@@ -99,6 +141,8 @@ async function querySubgraph<T>(query: string, variables: Record<string, unknown
     }
 
     const json = await response.json()
+    
+    console.log('Subgraph response:', json)
 
     if (json.errors) {
       console.error('Subgraph errors:', json.errors)
@@ -108,6 +152,7 @@ async function querySubgraph<T>(query: string, variables: Record<string, unknown
     return json.data
   } catch (error) {
     clearTimeout(timeoutId)
+    console.error('Subgraph error:', error)
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Subgraph request timed out')
     }
@@ -120,13 +165,69 @@ async function querySubgraph<T>(query: string, variables: Record<string, unknown
 // =============================================================================
 
 /**
+ * Extract voter address from vote ID (format: "claimId-voterAddress")
+ */
+function extractVoterFromId(id: string): string | null {
+  if (!id) return null
+  const parts = id.split('-')
+  if (parts.length >= 2) {
+    // The voter address is everything after the first dash
+    // (in case claimId has dashes, rejoin everything after first part)
+    return parts.slice(1).join('-').toLowerCase()
+  }
+  return null
+}
+
+/**
  * Get all votes by a specific voter address
+ * First tries direct filter, falls back to client-side filtering if empty
  */
 export async function getVotesByVoter(voterAddress: string): Promise<SubgraphVote[]> {
-  const data = await querySubgraph<{ votes: SubgraphVote[] }>(VOTES_BY_VOTER_QUERY, {
-    voter: voterAddress.toLowerCase()
+  // Guard against undefined/null address
+  if (!voterAddress) {
+    console.warn('getVotesByVoter called with empty address')
+    return []
+  }
+  
+  const normalizedAddress = voterAddress.toLowerCase()
+  
+  // Try direct query first
+  try {
+    const data = await querySubgraph<{ votes: SubgraphVote[] }>(VOTES_BY_VOTER_QUERY, {
+      voter: normalizedAddress
+    })
+    
+    if (data.votes && data.votes.length > 0) {
+      console.log(`Found ${data.votes.length} votes via direct query`)
+      return data.votes
+    }
+  } catch (e) {
+    console.warn('Direct voter query failed, trying fallback:', e)
+  }
+  
+  // Fallback: get all votes and filter client-side
+  // Note: The subgraph voter field may not be indexed, so we extract from ID
+  console.log('Using fallback: fetching all votes and filtering client-side')
+  const allData = await querySubgraph<{ votes: SubgraphVote[] }>(ALL_VOTES_QUERY, {})
+  
+  if (!allData.votes) {
+    console.warn('No votes returned from subgraph')
+    return []
+  }
+  
+  // Filter by voter - try both the voter field and extracting from ID
+  const filtered = allData.votes.filter(v => {
+    // First try the voter field
+    if (v.voter && v.voter.toLowerCase() === normalizedAddress) {
+      return true
+    }
+    // Fallback: extract voter from ID (format: "claimId-voterAddress")
+    const voterFromId = extractVoterFromId(v.id)
+    return voterFromId === normalizedAddress
   })
-  return data.votes
+  
+  console.log(`Found ${filtered.length} votes via client-side filter (out of ${allData.votes.length} total)`)
+  return filtered
 }
 
 /**
@@ -143,32 +244,46 @@ export async function getVoterStats(voterAddress: string): Promise<VoterStats> {
   let finalizedVotes = 0
   
   for (const vote of votes) {
+    // Skip votes with missing data
+    if (!vote || !vote.claim) {
+      console.warn('Skipping vote with missing claim data:', vote)
+      continue
+    }
+    
+    // Normalize vote to number (handles both string "Approve" and number 1)
+    const voteNum = normalizeVote(vote.vote)
+    
     // Count vote types
-    if (vote.vote === 1) approveVotes++
-    else if (vote.vote === 2) rejectVotes++
-    else if (vote.vote === 3) abstainVotes++
+    if (voteNum === 1) approveVotes++
+    else if (voteNum === 2) rejectVotes++
+    else if (voteNum === 3) abstainVotes++
     
     const claim = vote.claim
-    const isFinalized = claim.status === 'Approved' || claim.status === 'Rejected' || claim.status === 'Executed'
+    const status = claim.status || ''
+    const isFinalized = status === 'Approved' || status === 'Rejected' || status === 'Executed'
     
     if (isFinalized) {
       finalizedVotes++
       
       // Calculate deposit earnings for non-abstain votes on finalized claims
       // Deposit is split among all non-abstain voters
-      if (vote.vote !== 3) { // Not abstain
-        const nonAbstainVoters = claim.approveVotes + claim.rejectVotes
-        if (nonAbstainVoters > 0) {
-          const deposit = BigInt(claim.claimantDeposit)
-          const share = deposit / BigInt(nonAbstainVoters)
-          depositEarnings += share
+      if (voteNum !== 3) { // Not abstain
+        const nonAbstainVoters = (claim.approveVotes || 0) + (claim.rejectVotes || 0)
+        if (nonAbstainVoters > 0 && claim.claimantDeposit) {
+          try {
+            const deposit = BigInt(claim.claimantDeposit)
+            const share = deposit / BigInt(nonAbstainVoters)
+            depositEarnings += share
+          } catch (e) {
+            console.warn('Error calculating deposit share:', e)
+          }
         }
       }
       
       // Calculate win rate
-      const claimApproved = claim.status === 'Approved' || claim.status === 'Executed'
-      const votedApprove = vote.vote === 1
-      const votedReject = vote.vote === 2
+      const claimApproved = status === 'Approved' || status === 'Executed'
+      const votedApprove = voteNum === 1
+      const votedReject = voteNum === 2
       
       if ((claimApproved && votedApprove) || (!claimApproved && votedReject)) {
         correctVotes++

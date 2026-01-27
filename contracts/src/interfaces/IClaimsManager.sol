@@ -3,8 +3,17 @@ pragma solidity ^0.8.24;
 
 /**
  * @title IClaimsManager
- * @notice Manages the full lifecycle of claims: filing, evidence, voting, resolution
+ * @notice Manages the full lifecycle of claims: filing, voting, resolution
  * @dev Implements claim deposits, payment binding, and partial locking
+ * 
+ * v1.3 Changes (Audit Fixes):
+ * - Removed on-chain evidence storage (moved to off-chain system)
+ * - Added vote amount validation (approvedAmount <= claimedAmount)
+ * - Added safe math for median calculation
+ * - Added underflow protection for stats tracking
+ * - Added MAX_CLAIM_AMOUNT validation
+ * - Fixed markExecuted to be one-shot
+ * - Fixed deposit transfer functions with CEI pattern
  * 
  * v1.2 Changes:
  * - Added `Expired` status for claims that pass deadline with/without votes
@@ -47,8 +56,6 @@ interface IClaimsManager {
         address claimant;             // Address filing the claim
         uint256 claimedAmount;        // Amount requested (USDC)
         uint256 approvedAmount;       // Amount approved by council (may differ)
-        bytes32 evidenceHash;         // Hash of evidence document
-        string evidenceUri;           // URI to evidence
         bytes32 paymentReceiptHash;   // x402 payment receipt hash
         bytes32 termsHashAtClaimTime; // T&C hash when claim filed
         uint256 termsVersionAtClaimTime; // T&C version when filed
@@ -58,7 +65,7 @@ interface IClaimsManager {
         uint256 lockedCollateral;     // Collateral locked for this claim
         ClaimStatus status;
         uint256 filedAt;              // Timestamp when filed
-        uint256 evidenceDeadline;     // When evidence period ends
+        uint256 evidenceDeadline;     // When evidence period ends (voting starts after)
         uint256 votingDeadline;       // When voting period ends
         bool hadVotes;                // [v1.2] True if at least one vote was cast
     }
@@ -102,13 +109,6 @@ interface IClaimsManager {
         uint256 claimedAmount,
         uint256 claimantDeposit,
         bytes32 councilId
-    );
-
-    event EvidenceSubmitted(
-        uint256 indexed claimId,
-        bytes32 evidenceHash,
-        string evidenceUri,
-        bool isCounterEvidence
     );
 
     event VoteCast(
@@ -157,46 +157,17 @@ interface IClaimsManager {
      * @notice File a new claim against an agent
      * @param agentId The ERC-8004 token ID
      * @param claimedAmount The compensation amount requested (USDC)
-     * @param evidenceHash Hash of evidence document
-     * @param evidenceUri URI to evidence document
      * @param paymentReceiptHash x402 payment receipt hash proving paid service
      * @return claimId The new claim ID
      * @dev Requires prior USDC approval for deposit
      * @dev Council is derived from agent's active T&C (or governance override)
+     * @dev Evidence is handled off-chain; evidenceDeadline controls voting start
      */
     function fileClaim(
         uint256 agentId,
         uint256 claimedAmount,
-        bytes32 evidenceHash,
-        string calldata evidenceUri,
         bytes32 paymentReceiptHash
     ) external returns (uint256 claimId);
-
-    /**
-     * @notice Submit additional evidence for a claim
-     * @param claimId The claim ID
-     * @param evidenceHash Hash of additional evidence
-     * @param evidenceUri URI to additional evidence
-     * @dev Only claimant can call, only during evidence period
-     */
-    function submitAdditionalEvidence(
-        uint256 claimId,
-        bytes32 evidenceHash,
-        string calldata evidenceUri
-    ) external;
-
-    /**
-     * @notice Submit counter-evidence (for provider)
-     * @param claimId The claim ID
-     * @param evidenceHash Hash of counter-evidence
-     * @param evidenceUri URI to counter-evidence
-     * @dev Only agent owner can call, only during evidence period
-     */
-    function submitCounterEvidence(
-        uint256 claimId,
-        bytes32 evidenceHash,
-        string calldata evidenceUri
-    ) external;
 
     /**
      * @notice Cast vote on a claim

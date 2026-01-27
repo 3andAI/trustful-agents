@@ -65,6 +65,7 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
     uint256 public constant MAX_VOTING_PERIOD = 30 days;
     uint256 public constant MIN_EVIDENCE_PERIOD = 1 days;
     uint256 public constant MAX_EVIDENCE_PERIOD = 14 days;
+    uint256 public constant MAX_COUNCIL_MEMBERS = 11; // [v1.3] Cap for gas-safe operations
 
     // =========================================================================
     // Errors
@@ -80,6 +81,7 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
     error MemberNotActive(bytes32 councilId, address member);
     error MemberAlreadyActive(bytes32 councilId, address member);
     error CannotReactivateClosedCouncil(bytes32 councilId);
+    // [v1.3] CouncilMemberLimitReached and CouncilHasNoActiveMembers declared in ICouncilRegistry
 
     // =========================================================================
     // Constructor
@@ -260,8 +262,8 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
 
         bytes32 oldCouncilId = _agentCouncilOverride[agentId];
 
-        // Update counts
-        if (oldCouncilId != bytes32(0)) {
+        // Update counts - [v1.3] with underflow protection
+        if (oldCouncilId != bytes32(0) && _agentCountByCouncil[oldCouncilId] > 0) {
             _agentCountByCouncil[oldCouncilId]--;
         }
         _agentCountByCouncil[newCouncilId]++;
@@ -282,6 +284,11 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         Council storage council = _councils[councilId];
         if (council.createdAt == 0) revert CouncilNotFound(councilId);
         if (council.closedAt != 0) revert CouncilAlreadyClosed(councilId);
+
+        // [v1.3] Enforce member limit
+        if (council.memberCount >= MAX_COUNCIL_MEMBERS) {
+            revert CouncilMemberLimitReached(councilId, MAX_COUNCIL_MEMBERS);
+        }
 
         CouncilMember storage memberData = _members[councilId][member];
         if (memberData.joinedAt != 0) revert MemberAlreadyExists(councilId, member);
@@ -310,9 +317,22 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         CouncilMember storage memberData = _members[councilId][member];
         if (memberData.joinedAt == 0) revert MemberNotFound(councilId, member);
 
+        // [v1.3] Add underflow protection - ensure list isn't empty
+        uint256 listLength = _memberList[councilId].length;
+        if (listLength == 0) {
+            // Inconsistent state - member data exists but list is empty
+            // Just clean up member data without touching the list
+            if (memberData.active && council.memberCount > 0) {
+                council.memberCount--;
+            }
+            memberData.active = false;
+            emit MemberRemoved(councilId, member);
+            return;
+        }
+
         // Remove from list (swap and pop)
         uint256 index = _memberIndex[councilId][member];
-        uint256 lastIndex = _memberList[councilId].length - 1;
+        uint256 lastIndex = listLength - 1;
 
         if (index != lastIndex) {
             address lastMember = _memberList[councilId][lastIndex];
@@ -323,7 +343,7 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         delete _memberIndex[councilId][member];
 
         // Update state
-        if (memberData.active) {
+        if (memberData.active && council.memberCount > 0) {
             council.memberCount--;
         }
         memberData.active = false;
@@ -341,7 +361,10 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         if (!memberData.active) revert MemberNotActive(councilId, member);
 
         memberData.active = false;
-        council.memberCount--;
+        // [v1.3] Add underflow protection
+        if (council.memberCount > 0) {
+            council.memberCount--;
+        }
 
         emit MemberSuspended(councilId, member);
     }
@@ -499,6 +522,35 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         return _memberList[councilId];
     }
 
+    /**
+     * @notice Get only active (non-suspended) members of a council
+     * @param councilId The council identifier
+     * @return members Array of active member addresses
+     * @dev [v1.3] New function for accurate deposit distribution
+     */
+    function getActiveCouncilMembers(bytes32 councilId) external view returns (address[] memory) {
+        address[] storage allMembers = _memberList[councilId];
+        
+        // Count active members
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < allMembers.length; i++) {
+            if (_members[councilId][allMembers[i]].active) {
+                activeCount++;
+            }
+        }
+        
+        // Build array of active members
+        address[] memory activeMembers = new address[](activeCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < allMembers.length; i++) {
+            if (_members[councilId][allMembers[i]].active) {
+                activeMembers[index++] = allMembers[i];
+            }
+        }
+        
+        return activeMembers;
+    }
+
     /// @inheritdoc ICouncilRegistry
     function getActiveMemberCount(bytes32 councilId) external view returns (uint256) {
         return _councils[councilId].memberCount;
@@ -572,7 +624,10 @@ contract CouncilRegistry is ICouncilRegistry, TrustfulPausable {
         uint256 memberCount = council.memberCount;
         if (memberCount == 0) return 0;
 
-        return (memberCount * council.quorumPercentage + 9999) / 10000; // Round up
+        uint256 quorum = (memberCount * council.quorumPercentage + 9999) / 10000; // Round up
+        
+        // [v1.3] Ensure quorum is at least 1 when there are members
+        return quorum > 0 ? quorum : 1;
     }
 
     // =========================================================================

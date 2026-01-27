@@ -84,6 +84,8 @@ interface ICouncilRegistry {
     error CouncilHasActiveAgents(bytes32 councilId, uint256 agentCount);
     error CouncilHasPendingClaims(bytes32 councilId, uint256 claimCount);
     error AgentHasOpenClaims(uint256 agentId, uint256 pendingCount);
+    error CouncilMemberLimitReached(bytes32 councilId, uint256 maxMembers);  // [v1.3]
+    error CouncilHasNoActiveMembers(bytes32 councilId);  // [v1.3]
 
     // =========================================================================
     // Council Management (Governance)
@@ -302,6 +304,14 @@ interface ICouncilRegistry {
      * @return members Array of member addresses
      */
     function getCouncilMembers(bytes32 councilId) external view returns (address[] memory members);
+
+    /**
+     * @notice Get only active (non-suspended) members of a council
+     * @param councilId The council identifier
+     * @return members Array of active member addresses
+     * @dev [v1.3] New function for accurate deposit distribution
+     */
+    function getActiveCouncilMembers(bytes32 councilId) external view returns (address[] memory members);
 
     /**
      * @notice Get active member count for a council

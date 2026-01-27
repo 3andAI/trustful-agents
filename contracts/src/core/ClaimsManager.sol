@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { IClaimsManager } from "../interfaces/IClaimsManager.sol";
+import { ITrustfulPausable } from "../interfaces/ITrustfulPausable.sol";
 import { TrustfulPausable } from "../base/TrustfulPausable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,13 +10,25 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 /**
  * @title ClaimsManager
- * @notice Manages the full lifecycle of claims: filing, evidence, voting, resolution
+ * @notice Manages the full lifecycle of claims: filing, voting, resolution
  * @dev Implements claim deposits, payment binding, and collateral locking
+ *
+ * v1.3 Changes (Audit Fixes):
+ * - Removed on-chain evidence storage (moved to off-chain system)
+ * - Added vote amount validation (approvedAmount <= claimedAmount)
+ * - Added safe math for median calculation (prevents overflow DoS)
+ * - Added underflow protection for stats tracking
+ * - Added MAX_CLAIM_AMOUNT validation
+ * - Fixed markExecuted to be one-shot
+ * - Fixed deposit transfer functions with CEI pattern
+ * - Added pause modifiers to voting and finalization
+ * - Added council active member check when filing claims
+ * - Changed sorting algorithm to insertion sort for cleaner auditing
  *
  * Key Design:
  * - Claimant must deposit USDC (percentage of claim amount)
  * - Deposit always goes to voting council members (regardless of outcome)
- * - Evidence period allows both parties to submit evidence
+ * - Evidence period handled off-chain; on-chain period controls voting start
  * - Voting period for council members to vote
  * - Median approved amount used for partial awards
  * - No cap on concurrent claims per agent
@@ -74,17 +87,31 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
     // =========================================================================
 
     uint256 public constant MIN_CLAIM_AMOUNT = 1e6; // 1 USDC minimum
+    uint256 public constant MAX_CLAIM_AMOUNT = 1_000_000_000e6; // 1 billion USDC maximum
 
     // =========================================================================
     // Errors
     // =========================================================================
 
     error InsufficientClaimAmount(uint256 provided, uint256 minimum);
+    error ExcessiveClaimAmount(uint256 provided, uint256 maximum);
     error AgentNotValidated(uint256 agentId);
     error NoActiveTerms(uint256 agentId);
     error InsufficientDeposit(uint256 provided, uint256 required);
     error NotAgentOwner(uint256 agentId, address caller);
     error InvalidConfiguration();
+    error ApprovedAmountExceedsClaimed(uint256 approvedAmount, uint256 claimedAmount);
+    error CouncilHasNoActiveMembers(bytes32 councilId);
+    error ClaimAlreadyExecuted(uint256 claimId);
+
+    // =========================================================================
+    // Events (for configuration changes)
+    // =========================================================================
+
+    event CollateralVaultUpdated(address indexed oldVault, address indexed newVault);
+    event TermsRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+    event CouncilRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+    event RulingExecutorUpdated(address indexed oldExecutor, address indexed newExecutor);
 
     // =========================================================================
     // Constructor
@@ -106,22 +133,30 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
 
     function setCollateralVault(address vault_) external onlyGovernance {
         if (vault_ == address(0)) revert ZeroAddress();
+        address oldVault = address(collateralVault);
         collateralVault = ICollateralVault(vault_);
+        emit CollateralVaultUpdated(oldVault, vault_);
     }
 
     function setTermsRegistry(address registry_) external onlyGovernance {
         if (registry_ == address(0)) revert ZeroAddress();
+        address oldRegistry = address(termsRegistry);
         termsRegistry = ITermsRegistry(registry_);
+        emit TermsRegistryUpdated(oldRegistry, registry_);
     }
 
     function setCouncilRegistry(address registry_) external onlyGovernance {
         if (registry_ == address(0)) revert ZeroAddress();
+        address oldRegistry = address(councilRegistry);
         councilRegistry = ICouncilRegistry(registry_);
+        emit CouncilRegistryUpdated(oldRegistry, registry_);
     }
 
     function setRulingExecutor(address executor_) external onlyGovernance {
         if (executor_ == address(0)) revert ZeroAddress();
+        address oldExecutor = rulingExecutor;
         rulingExecutor = executor_;
+        emit RulingExecutorUpdated(oldExecutor, executor_);
     }
 
     // =========================================================================
@@ -132,15 +167,16 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
     function fileClaim(
         uint256 agentId,
         uint256 claimedAmount,
-        bytes32 evidenceHash,
-        string calldata evidenceUri,
         bytes32 paymentReceiptHash
-    ) external nonReentrant returns (uint256 claimId) {
+    ) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Claims) returns (uint256 claimId) {
         _requireConfigured();
 
         // Validate claim amount
         if (claimedAmount < MIN_CLAIM_AMOUNT) {
             revert InsufficientClaimAmount(claimedAmount, MIN_CLAIM_AMOUNT);
+        }
+        if (claimedAmount > MAX_CLAIM_AMOUNT) {
+            revert ExcessiveClaimAmount(claimedAmount, MAX_CLAIM_AMOUNT);
         }
 
         // Get agent's active terms
@@ -163,6 +199,12 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
             revert ICouncilRegistry.CouncilNotActive(councilId);
         }
 
+        // [v1.3] Validate council has active members
+        uint256 activeMemberCount = councilRegistry.getActiveMemberCount(councilId);
+        if (activeMemberCount == 0) {
+            revert CouncilHasNoActiveMembers(councilId);
+        }
+
         // Calculate and transfer deposit
         uint256 requiredDeposit = councilRegistry.calculateRequiredDeposit(councilId, claimedAmount);
         _USDC.safeTransferFrom(msg.sender, address(this), requiredDeposit);
@@ -182,8 +224,6 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
             claimant: msg.sender,
             claimedAmount: claimedAmount,
             approvedAmount: 0,
-            evidenceHash: evidenceHash,
-            evidenceUri: evidenceUri,
             paymentReceiptHash: paymentReceiptHash,
             termsHashAtClaimTime: terms.contentHash,
             termsVersionAtClaimTime: termsVersion,
@@ -214,48 +254,12 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IClaimsManager
-    function submitAdditionalEvidence(
-        uint256 claimId,
-        bytes32 evidenceHash,
-        string calldata evidenceUri
-    ) external {
-        Claim storage claim = _claims[claimId];
-        if (claim.claimId == 0) revert ClaimNotFound(claimId);
-        if (msg.sender != claim.claimant) revert NotClaimant(claimId, msg.sender);
-        if (block.timestamp > claim.evidenceDeadline) revert EvidencePeriodEnded(claimId);
-
-        // Update evidence (overwrites previous)
-        claim.evidenceHash = evidenceHash;
-        claim.evidenceUri = evidenceUri;
-
-        emit EvidenceSubmitted(claimId, evidenceHash, evidenceUri, false);
-    }
-
-    /// @inheritdoc IClaimsManager
-    function submitCounterEvidence(
-        uint256 claimId,
-        bytes32 evidenceHash,
-        string calldata evidenceUri
-    ) external {
-        Claim storage claim = _claims[claimId];
-        if (claim.claimId == 0) revert ClaimNotFound(claimId);
-
-        // Only agent owner at claim time can submit counter-evidence
-        if (msg.sender != claim.providerAtClaimTime) {
-            revert NotAgentOwner(claim.agentId, msg.sender);
-        }
-        if (block.timestamp > claim.evidenceDeadline) revert EvidencePeriodEnded(claimId);
-
-        emit EvidenceSubmitted(claimId, evidenceHash, evidenceUri, true);
-    }
-
-    /// @inheritdoc IClaimsManager
     function castVote(
         uint256 claimId,
         Vote vote,
         uint256 approvedAmount,
         string calldata reasoning
-    ) external {
+    ) external whenNotPaused(ITrustfulPausable.PauseScope.Voting) {
         Claim storage claim = _claims[claimId];
         if (claim.claimId == 0) revert ClaimNotFound(claimId);
 
@@ -277,6 +281,15 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
             revert AlreadyVoted(claimId, msg.sender);
         }
 
+        // [v1.3] Validate approved amount if approving
+        uint256 validatedAmount = 0;
+        if (vote == Vote.Approve) {
+            if (approvedAmount > claim.claimedAmount) {
+                revert ApprovedAmountExceedsClaimed(approvedAmount, claim.claimedAmount);
+            }
+            validatedAmount = approvedAmount;
+        }
+
         // Update claim status if first time in voting period
         if (claim.status == ClaimStatus.Filed) {
             claim.status = ClaimStatus.EvidenceClosed;
@@ -286,7 +299,7 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
         _votes[claimId][msg.sender] = VoteRecord({
             voter: msg.sender,
             vote: vote,
-            approvedAmount: vote == Vote.Approve ? approvedAmount : 0,
+            approvedAmount: validatedAmount,
             reasoning: reasoning,
             votedAt: block.timestamp,
             lastChangedAt: 0
@@ -298,7 +311,7 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
         // Update member stats
         councilRegistry.incrementMemberVotes(claim.councilId, msg.sender);
 
-        emit VoteCast(claimId, msg.sender, vote, approvedAmount);
+        emit VoteCast(claimId, msg.sender, vote, validatedAmount);
     }
 
     /// @inheritdoc IClaimsManager
@@ -307,7 +320,7 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
         Vote newVote,
         uint256 newApprovedAmount,
         string calldata newReasoning
-    ) external {
+    ) external whenNotPaused(ITrustfulPausable.PauseScope.Voting) {
         Claim storage claim = _claims[claimId];
         if (claim.claimId == 0) revert ClaimNotFound(claimId);
 
@@ -322,21 +335,30 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
             revert NotYetVoted(claimId, msg.sender);
         }
 
+        // [v1.3] Validate approved amount if approving
+        uint256 validatedAmount = 0;
+        if (newVote == Vote.Approve) {
+            if (newApprovedAmount > claim.claimedAmount) {
+                revert ApprovedAmountExceedsClaimed(newApprovedAmount, claim.claimedAmount);
+            }
+            validatedAmount = newApprovedAmount;
+        }
+
         // Store old values for event
         Vote oldVote = record.vote;
         uint256 oldApprovedAmount = record.approvedAmount;
 
         // Update vote
         record.vote = newVote;
-        record.approvedAmount = newVote == Vote.Approve ? newApprovedAmount : 0;
+        record.approvedAmount = validatedAmount;
         record.reasoning = newReasoning;
         record.lastChangedAt = block.timestamp;
 
-        emit VoteChanged(claimId, msg.sender, oldVote, newVote, oldApprovedAmount, newApprovedAmount);
+        emit VoteChanged(claimId, msg.sender, oldVote, newVote, oldApprovedAmount, validatedAmount);
     }
 
     /// @inheritdoc IClaimsManager
-    function finalizeClaim(uint256 claimId) external nonReentrant {
+    function finalizeClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Executions) {
         Claim storage claim = _claims[claimId];
         if (claim.claimId == 0) revert ClaimNotFound(claimId);
 
@@ -379,7 +401,7 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IClaimsManager
-    function cancelClaim(uint256 claimId) external nonReentrant {
+    function cancelClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Claims) {
         Claim storage claim = _claims[claimId];
         if (claim.claimId == 0) revert ClaimNotFound(claimId);
         if (msg.sender != claim.claimant) revert NotClaimant(claimId, msg.sender);
@@ -538,20 +560,25 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
 
         if (count == 0) return 0;
 
-        // Sort amounts (simple bubble sort - fine for small arrays)
-        for (uint256 i = 0; i < count - 1; i++) {
-            for (uint256 j = 0; j < count - i - 1; j++) {
-                if (amounts[j] > amounts[j + 1]) {
-                    (amounts[j], amounts[j + 1]) = (amounts[j + 1], amounts[j]);
-                }
+        // [v1.3] Sort using insertion sort (cleaner for audits, O(n²) is fine for n<=11)
+        for (uint256 i = 1; i < count; i++) {
+            uint256 key = amounts[i];
+            uint256 j = i;
+            while (j > 0 && amounts[j - 1] > key) {
+                amounts[j] = amounts[j - 1];
+                j--;
             }
+            amounts[j] = key;
         }
 
-        // Return median
+        // Return median with safe averaging
         if (count % 2 == 1) {
             return amounts[count / 2];
         } else {
-            return (amounts[count / 2 - 1] + amounts[count / 2]) / 2;
+            // [v1.3] Safe average calculation to prevent overflow
+            uint256 a = amounts[count / 2 - 1];
+            uint256 b = amounts[count / 2];
+            return a / 2 + b / 2 + (a % 2 + b % 2) / 2;
         }
     }
 
@@ -585,7 +612,11 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
 
     function _updateStatsOnResolution(uint256 agentId, ClaimStatus status) internal {
         ClaimStats storage stats = _agentStats[agentId];
-        stats.pendingClaims--;
+        
+        // [v1.3] Add underflow protection
+        if (stats.pendingClaims > 0) {
+            stats.pendingClaims--;
+        }
 
         if (status == ClaimStatus.Approved) {
             stats.approvedClaims++;
@@ -611,12 +642,16 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
      * @notice Transfer deposit to RulingExecutor for distribution
      * @param claimId The claim ID
      * @dev Called by RulingExecutor
+     * @dev [v1.3] Uses CEI pattern - zeros deposit before transfer
      */
     function transferDepositToExecutor(uint256 claimId) external {
         require(msg.sender == rulingExecutor, "Only RulingExecutor");
         Claim storage claim = _claims[claimId];
-        if (claim.claimantDeposit > 0) {
-            _USDC.safeTransfer(rulingExecutor, claim.claimantDeposit);
+        uint256 amount = claim.claimantDeposit;
+        if (amount > 0) {
+            // [v1.3] CEI: Effects before Interactions
+            claim.claimantDeposit = 0;
+            _USDC.safeTransfer(rulingExecutor, amount);
         }
     }
 
@@ -624,12 +659,17 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
      * @notice Return deposit to claimant (for expired claims with no votes)
      * @param claimId The claim ID
      * @dev Called by RulingExecutor
+     * @dev [v1.3] Uses CEI pattern - zeros deposit before transfer
      */
     function returnDepositToClaimant(uint256 claimId) external {
         require(msg.sender == rulingExecutor, "Only RulingExecutor");
         Claim storage claim = _claims[claimId];
-        if (claim.claimantDeposit > 0) {
-            _USDC.safeTransfer(claim.claimant, claim.claimantDeposit);
+        uint256 amount = claim.claimantDeposit;
+        address claimant = claim.claimant;
+        if (amount > 0) {
+            // [v1.3] CEI: Effects before Interactions
+            claim.claimantDeposit = 0;
+            _USDC.safeTransfer(claimant, amount);
         }
     }
 
@@ -638,10 +678,24 @@ contract ClaimsManager is IClaimsManager, TrustfulPausable, ReentrancyGuard {
      * @param claimId The claim ID
      * @param paidAmount Amount paid to claimant (for stats)
      * @dev Called by RulingExecutor
+     * @dev [v1.3] One-shot execution - reverts if already executed
      */
     function markExecuted(uint256 claimId, uint256 paidAmount) external {
         require(msg.sender == rulingExecutor, "Only RulingExecutor");
         Claim storage claim = _claims[claimId];
+        
+        // [v1.3] Ensure claim is in a finalized state, not already executed
+        if (claim.status == ClaimStatus.Executed) {
+            revert ClaimAlreadyExecuted(claimId);
+        }
+        require(
+            claim.status == ClaimStatus.Approved ||
+            claim.status == ClaimStatus.Rejected ||
+            claim.status == ClaimStatus.Cancelled ||
+            claim.status == ClaimStatus.Expired,
+            "Claim not finalized"
+        );
+
         claim.status = ClaimStatus.Executed;
         _agentStats[claim.agentId].totalPaidOut += paidAmount;
 
@@ -696,6 +750,7 @@ interface ICouncilRegistry {
     function calculateRequiredDeposit(bytes32 councilId, uint256 claimAmount) external view returns (uint256);
     function calculateQuorum(bytes32 councilId) external view returns (uint256);
     function getAgentCouncil(uint256 agentId) external view returns (bytes32);
+    function getActiveMemberCount(bytes32 councilId) external view returns (uint256);
     function incrementPendingClaims(bytes32 councilId) external;
     function decrementPendingClaims(bytes32 councilId) external;
     function incrementMemberVotes(bytes32 councilId, address member) external;

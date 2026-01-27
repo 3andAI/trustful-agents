@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { IRulingExecutor } from "../interfaces/IRulingExecutor.sol";
+import { ITrustfulPausable } from "../interfaces/ITrustfulPausable.sol";
 import { TrustfulPausable } from "../base/TrustfulPausable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,6 +12,11 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  * @title RulingExecutor
  * @notice Executes claim rulings and distributes deposits to voting council members
  * @dev Coordinates between ClaimsManager and CollateralVault
+ *
+ * v1.3 Changes (Audit Fixes):
+ * - Added pause modifiers to individual execute functions
+ * - Updated _distributeDepositToAllMembers to use getActiveCouncilMembers
+ * - Added configuration change events
  *
  * Distribution Rules (v1.2):
  * - Claimant deposits ALWAYS go to voting council members
@@ -82,7 +88,7 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     // =========================================================================
 
     /// @inheritdoc IRulingExecutor
-    function executeApprovedClaim(uint256 claimId) external nonReentrant {
+    function executeApprovedClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Executions) {
         _requireConfigured();
         
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
@@ -121,7 +127,7 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IRulingExecutor
-    function executeRejectedClaim(uint256 claimId) external nonReentrant {
+    function executeRejectedClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Executions) {
         _requireConfigured();
 
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
@@ -147,7 +153,7 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IRulingExecutor
-    function executeCancelledClaim(uint256 claimId) external nonReentrant {
+    function executeCancelledClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Executions) {
         _requireConfigured();
 
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
@@ -169,7 +175,7 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     }
 
     /// @inheritdoc IRulingExecutor
-    function executeExpiredClaim(uint256 claimId) external nonReentrant {
+    function executeExpiredClaim(uint256 claimId) external nonReentrant whenNotPaused(ITrustfulPausable.PauseScope.Executions) {
         _requireConfigured();
 
         IClaimsManager.Claim memory claim = claimsManager.getClaim(claimId);
@@ -376,22 +382,24 @@ contract RulingExecutor is IRulingExecutor, TrustfulPausable, ReentrancyGuard {
     }
 
     /**
-     * @notice Distribute deposit to all council members (for cancelled claims)
+     * @notice Distribute deposit to all active council members (for cancelled claims)
+     * @dev [v1.3] Updated to use getActiveCouncilMembers - suspended members don't receive share
      */
     function _distributeDepositToAllMembers(uint256 claimId, IClaimsManager.Claim memory claim) internal {
-        address[] memory members = councilRegistry.getCouncilMembers(claim.councilId);
+        // [v1.3] Use getActiveCouncilMembers instead of getCouncilMembers
+        address[] memory members = councilRegistry.getActiveCouncilMembers(claim.councilId);
 
         if (members.length == 0) {
-            // No members - return to claimant
+            // No active members - return to claimant
             claimsManager.returnDepositToClaimant(claimId);
-            emit DepositReturned(claimId, claim.claimant, claim.claimantDeposit, "No council members");
+            emit DepositReturned(claimId, claim.claimant, claim.claimantDeposit, "No active council members");
             return;
         }
 
         // Transfer deposit from ClaimsManager
         claimsManager.transferDepositToExecutor(claimId);
 
-        // Distribute equally to all members
+        // Distribute equally to all active members
         uint256 perMember = claim.claimantDeposit / members.length;
         uint256 remainder = claim.claimantDeposit % members.length;
 
@@ -433,14 +441,13 @@ interface IClaimsManager {
         Expired
     }
 
+    // v1.3: evidenceHash and evidenceUri removed from Claim struct
     struct Claim {
         uint256 claimId;
         uint256 agentId;
         address claimant;
         uint256 claimedAmount;
         uint256 approvedAmount;
-        bytes32 evidenceHash;
-        string evidenceUri;
         bytes32 paymentReceiptHash;
         bytes32 termsHashAtClaimTime;
         uint256 termsVersionAtClaimTime;
@@ -469,4 +476,5 @@ interface ICollateralVault {
 
 interface ICouncilRegistry {
     function getCouncilMembers(bytes32 councilId) external view returns (address[] memory);
+    function getActiveCouncilMembers(bytes32 councilId) external view returns (address[] memory);
 }

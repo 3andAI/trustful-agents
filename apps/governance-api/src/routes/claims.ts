@@ -16,6 +16,7 @@ const router = Router();
 
 const CLAIMS_MANAGER_ADDRESS = process.env.CLAIMS_MANAGER_ADDRESS as Address;
 const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS as Address;
+const RULING_EXECUTOR_ADDRESS = process.env.RULING_EXECUTOR_ADDRESS as Address;
 
 // ============================================================================
 // ABI Definitions
@@ -50,6 +51,14 @@ const councilRegistryABI = parseAbi([
   'function isActiveMember(bytes32 councilId, address member) view returns (bool)',
   'function getCouncilMembers(bytes32 councilId) view returns (address[])',
   'function getCouncil(bytes32 councilId) view returns ((bytes32 councilId, string name, string description, string vertical, uint256 memberCount, uint256 quorumPercentage, uint256 claimDepositPercentage, uint256 votingPeriod, uint256 evidencePeriod, bool active, uint256 createdAt, uint256 closedAt))',
+]);
+
+const rulingExecutorABI = parseAbi([
+  'function executeClaim(uint256 claimId)',
+  'function executeApprovedClaim(uint256 claimId)',
+  'function executeRejectedClaim(uint256 claimId)',
+  'function executeExpiredClaim(uint256 claimId)',
+  'function executeCancelledClaim(uint256 claimId)',
 ]);
 
 // ============================================================================
@@ -157,7 +166,16 @@ function formatClaim(claim: any): ClaimResponse {
     isInEvidencePeriod: now < evidenceDeadline && status === ClaimStatus.Filed,
     isInVotingPeriod: now >= evidenceDeadline && now < votingDeadline && (status === ClaimStatus.Filed || status === ClaimStatus.EvidenceClosed),
     canVote: now >= evidenceDeadline && now < votingDeadline && (status === ClaimStatus.Filed || status === ClaimStatus.EvidenceClosed),
-    canFinalize: now >= votingDeadline && status <= ClaimStatus.VotingClosed,
+    // canFinalize is true when:
+    // 1. Voting period ended and claim needs finalization (status Filed/EvidenceClosed/VotingClosed)
+    // 2. OR claim is finalized but needs execution (status Approved/Rejected/Cancelled/Expired)
+    canFinalize: status !== ClaimStatus.Executed && (
+      (now >= votingDeadline && status <= ClaimStatus.VotingClosed) ||
+      status === ClaimStatus.Approved ||
+      status === ClaimStatus.Rejected ||
+      status === ClaimStatus.Cancelled ||
+      status === ClaimStatus.Expired
+    ),
   };
 }
 
@@ -439,6 +457,9 @@ router.post('/:claimId/vote', async (req: Request, res: Response) => {
 });
 
 // POST /claims/:claimId/finalize - Get transaction data for finalization
+// This endpoint is SMART: it returns the correct transaction based on claim status
+// - If claim needs finalization (Filed/EvidenceClosed) → returns finalizeClaim tx
+// - If claim is already finalized (Approved/Rejected/Expired) → returns executeClaim tx
 router.post('/:claimId/finalize', async (req: Request, res: Response) => {
   try {
     const { claimId } = req.params;
@@ -447,23 +468,103 @@ router.post('/:claimId/finalize', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'CLAIMS_MANAGER_ADDRESS not configured' });
     }
     
-    const data = encodeFunctionData({
+    // Get current claim status
+    const claim = await publicClient.readContract({
+      address: CLAIMS_MANAGER_ADDRESS,
       abi: claimsManagerABI,
-      functionName: 'finalizeClaim',
+      functionName: 'getClaim',
+      args: [BigInt(claimId)],
+    }) as any;
+    
+    const status = Number(claim.status);
+    
+    // ClaimStatus enum: Filed=0, EvidenceClosed=1, VotingClosed=2, Approved=3, Rejected=4, Executed=5, Cancelled=6, Expired=7
+    
+    if (status === 5) {
+      // Already executed
+      return res.status(400).json({ error: 'Claim already executed' });
+    }
+    
+    if (status === 0 || status === 1) {
+      // Needs finalization first (Filed or EvidenceClosed)
+      const data = encodeFunctionData({
+        abi: claimsManagerABI,
+        functionName: 'finalizeClaim',
+        args: [BigInt(claimId)],
+      });
+      
+      return res.json({
+        transaction: {
+          to: CLAIMS_MANAGER_ADDRESS,
+          data,
+          value: '0',
+        },
+        step: 'finalize',
+        message: 'Transaction to finalize claim voting. After this completes, call finalize again to execute and distribute funds.',
+      });
+    }
+    
+    if (status === 3 || status === 4 || status === 6 || status === 7) {
+      // Already finalized, needs execution (Approved, Rejected, Cancelled, Expired)
+      if (!RULING_EXECUTOR_ADDRESS) {
+        return res.status(500).json({ error: 'RULING_EXECUTOR_ADDRESS not configured' });
+      }
+      
+      const data = encodeFunctionData({
+        abi: rulingExecutorABI,
+        functionName: 'executeClaim',
+        args: [BigInt(claimId)],
+      });
+      
+      const statusNames = ['Filed', 'EvidenceClosed', 'VotingClosed', 'Approved', 'Rejected', 'Executed', 'Cancelled', 'Expired'];
+      
+      return res.json({
+        transaction: {
+          to: RULING_EXECUTOR_ADDRESS,
+          data,
+          value: '0',
+        },
+        step: 'execute',
+        message: `Transaction to execute ${statusNames[status]} claim. This will distribute funds to claimant (if approved) and deposits to voters.`,
+      });
+    }
+    
+    // VotingClosed (2) - shouldn't happen normally
+    return res.status(400).json({ error: 'Claim is in VotingClosed status - please wait or contact support' });
+    
+  } catch (error) {
+    console.error('Error preparing finalize transaction:', error);
+    res.status(500).json({ error: 'Failed to prepare finalize transaction' });
+  }
+});
+
+// POST /claims/:claimId/execute - Get transaction data for execution (RulingExecutor)
+// Use this after finalizeClaim to distribute funds
+router.post('/:claimId/execute', async (req: Request, res: Response) => {
+  try {
+    const { claimId } = req.params;
+    
+    if (!RULING_EXECUTOR_ADDRESS) {
+      return res.status(500).json({ error: 'RULING_EXECUTOR_ADDRESS not configured' });
+    }
+    
+    const data = encodeFunctionData({
+      abi: rulingExecutorABI,
+      functionName: 'executeClaim',
       args: [BigInt(claimId)],
     });
     
     res.json({
       transaction: {
-        to: CLAIMS_MANAGER_ADDRESS,
+        to: RULING_EXECUTOR_ADDRESS,
         data,
         value: '0',
       },
-      message: 'Transaction to finalize claim',
+      message: 'Transaction to execute claim ruling and distribute funds',
     });
   } catch (error) {
-    console.error('Error preparing finalize transaction:', error);
-    res.status(500).json({ error: 'Failed to prepare finalize transaction' });
+    console.error('Error preparing execute transaction:', error);
+    res.status(500).json({ error: 'Failed to prepare execute transaction' });
   }
 });
 
