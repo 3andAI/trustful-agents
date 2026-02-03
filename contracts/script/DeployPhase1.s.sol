@@ -29,10 +29,11 @@ import { ERC8004RegistryMock } from "../test/mocks/ERC8004RegistryMock.sol";
  *     -vvvv
  *
  * Required environment variables:
- *   - DEPLOYER_PRIVATE_KEY: Private key of deployer (also becomes governance)
+ *   - DEPLOYER_PRIVATE_KEY: Private key of deployer
  *   - RPC_URL: RPC endpoint (e.g., Base Sepolia)
  *
  * Optional environment variables:
+ *   - GOVERNANCE_ADDRESS: Address for governance (Safe multisig). Defaults to deployer.
  *   - USDC_ADDRESS: Existing USDC address (deploys mock if not set)
  *   - ERC8004_REGISTRY_ADDRESS: Existing registry (deploys mock if not set)
  *   - WITHDRAWAL_GRACE_PERIOD: Grace period in seconds (default: 7 days)
@@ -99,13 +100,14 @@ contract DeployPhase1 is Script {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
-        governance = deployer; // For Phase 1, deployer is governance
+        governance = vm.envOr("GOVERNANCE_ADDRESS", deployer);
 
         console.log("===========================================");
         console.log("  Trustful Agents Phase 1 Deployment");
         console.log("===========================================");
         console.log("");
-        console.log("Deployer/Governance:", deployer);
+        console.log("Deployer:", deployer);
+        console.log("Governance:", governance);
         console.log("Chain ID:", block.chainid);
         console.log("Mode:", upgradeMode ? "UPGRADE (new Phase 1 contracts only)" : "FULL");
         console.log("");
@@ -283,7 +285,8 @@ contract DeployPhase1 is Script {
         console.log("===========================================");
         console.log("");
         console.log("Network:", _getNetworkName(block.chainid));
-        console.log("Deployer/Governance:", deployer);
+        console.log("Deployer:", deployer);
+        console.log("Governance:", governance);
         console.log("");
         console.log("External Dependencies:");
         console.log("  USDC:", usdc, mockUsdc != address(0) ? "(mock)" : "");

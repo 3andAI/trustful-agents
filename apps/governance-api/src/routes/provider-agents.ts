@@ -20,7 +20,7 @@ const router = Router();
 const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 
 const CONTRACTS = {
-  erc8004Registry: '0xb3B4b5042Fd3600404846671Ff5558719860b694',
+  erc8004Registry: '0x454909C7551158e12a6a5192dEB359dDF067ec80',
 } as const;
 
 const Erc8004RegistryAbi = [

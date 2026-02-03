@@ -9,7 +9,6 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  ExternalLink,
   Loader2,
   Plus,
   DollarSign
@@ -29,7 +28,6 @@ import {
   getStatusLabel,
   canSubmitEvidence,
   canCancelClaim,
-  ipfsToHttp,
   fetchAgentMetadata,
   getAgentDisplayName,
   type AgentMetadata
@@ -144,7 +142,7 @@ export default function ClaimDetail() {
               c.councilId?.toLowerCase() === claim.councilId?.toLowerCase()
             )
             if (isCouncilMember) {
-              setUserRole('councilor')
+              setUserRole('council')
             }
           })
           .catch(err => console.error('Failed to check council membership:', err))
@@ -350,46 +348,6 @@ export default function ClaimDetail() {
                   {formatAddress(claim.claimant)}
                 </p>
               </div>
-            </div>
-          </div>
-
-          {/* Evidence */}
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold text-surface-100 mb-4">Evidence</h2>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-surface-800 rounded-lg border border-surface-700">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-surface-400">Primary Evidence</span>
-                  {claim.evidenceUri && ipfsToHttp(claim.evidenceUri) && (
-                    <a 
-                      href={ipfsToHttp(claim.evidenceUri)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-claimer hover:text-claimer-light flex items-center gap-1"
-                    >
-                      View <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-                <p className="text-sm text-surface-500 font-mono break-all">
-                  Hash: {claim.evidenceHash}
-                </p>
-                {claim.evidenceUri && (
-                  <p className="text-sm text-surface-500 font-mono break-all mt-1">
-                    URI: {claim.evidenceUri}
-                  </p>
-                )}
-              </div>
-
-              {claim.paymentReceiptHash && claim.paymentReceiptHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
-                <div className="p-4 bg-surface-800 rounded-lg border border-surface-700">
-                  <p className="text-surface-400 mb-2">Payment Receipt</p>
-                  <p className="text-sm text-surface-500 font-mono break-all">
-                    {claim.paymentReceiptHash}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 

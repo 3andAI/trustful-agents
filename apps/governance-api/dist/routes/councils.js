@@ -262,7 +262,7 @@ router.get('/:id/agents', validateParams(councilIdParamSchema), async (req, res)
         const client = getClient();
         console.log(`Fetching agents for council ${councilId}`);
         // Get total supply of agents from ERC8004Registry
-        const ERC8004_REGISTRY = process.env.ERC8004_REGISTRY_ADDRESS || '0xb3B4b5042Fd3600404846671Ff5558719860b694';
+        const ERC8004_REGISTRY = process.env.ERC8004_REGISTRY_ADDRESS || '0x454909C7551158e12a6a5192dEB359dDF067ec80';
         const ERC8004ABI = [
             {
                 type: 'function',

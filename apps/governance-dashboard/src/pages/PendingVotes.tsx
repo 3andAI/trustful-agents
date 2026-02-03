@@ -13,14 +13,19 @@ import {
   UserMinus,
   Trash2,
   RefreshCw,
+  PenLine,
+  Play,
+  AlertTriangle,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   getPendingTransactions,
   syncPendingTransactions,
+  clearAllPendingTransactions,
   getSafeInfo,
-  type PendingTransaction,
 } from '../lib/api';
+import { useSafeConfirm, type SafePendingTransaction } from '../hooks/useSafeConfirm';
+import { useWallet } from '../hooks/useWallet';
 
 // Action type icons and labels
 const ACTION_CONFIG: Record<string, { icon: typeof Building2; label: string; color: string }> = {
@@ -32,11 +37,34 @@ const ACTION_CONFIG: Record<string, { icon: typeof Building2; label: string; col
 
 export default function PendingVotesPage() {
   const queryClient = useQueryClient();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const { address } = useWallet();
+  
+  const {
+    fetchPendingTransactions,
+    confirmTransaction,
+    executeTransaction,
+    isOwner,
+    hasAlreadySigned,
+    isConfirming,
+    isExecuting,
+    safeAddress,
+    safeOwners,
+  } = useSafeConfirm();
 
-  const { data, isLoading, error, refetch } = useQuery({
+  // Fetch from our database (for metadata like title, actionType)
+  const { data: dbData } = useQuery({
     queryKey: ['pendingTransactions'],
     queryFn: getPendingTransactions,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+  });
+
+  // Fetch from Safe API (for actual confirmations)
+  const { data: safeTxs, isLoading, error, refetch } = useQuery({
+    queryKey: ['safePendingTransactions', safeAddress],
+    queryFn: fetchPendingTransactions,
+    enabled: !!safeAddress,
+    refetchInterval: 15000, // Refresh every 15 seconds
   });
 
   const { data: safeInfo } = useQuery({
@@ -48,15 +76,48 @@ export default function PendingVotesPage() {
     mutationFn: syncPendingTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['safePendingTransactions'] });
     },
   });
 
-  const transactions = data?.transactions ?? [];
-  const threshold = data?.safeThreshold ?? safeInfo?.threshold ?? 1;
+  const clearAllMutation = useMutation({
+    mutationFn: clearAllPendingTransactions,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['pendingTransactions'] });
+      setShowClearConfirm(false);
+      alert(`Cleared ${result.cleared} pending transaction(s)`);
+    },
+    onError: (err) => {
+      alert(`Failed to clear: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    },
+  });
+
+  // Merge database metadata with Safe API data
+  const transactions = (safeTxs || []).map(safeTx => {
+    const dbTx = dbData?.transactions.find(t => t.safeTxHash === safeTx.safeTxHash);
+    return {
+      ...safeTx,
+      title: dbTx?.title || `Transaction to ${safeTx.to.slice(0, 10)}...`,
+      description: dbTx?.description,
+      actionType: dbTx?.actionType || 'unknown',
+      metadata: dbTx?.metadata || {},
+    };
+  });
+
+  const threshold = safeInfo?.threshold ?? 2;
+
+  // Get current on-chain nonce (lowest nonce among pending txs or from safeInfo)
+  const currentNonce = transactions.length > 0 
+    ? Math.min(...transactions.map(t => t.nonce))
+    : null;
+
+  // Filter to show only transactions at current nonce (executable ones)
+  const executableTxs = transactions.filter(t => t.nonce === currentNonce);
+  const queuedTxs = transactions.filter(t => t.nonce !== currentNonce);
 
   const getSafeUrl = () => {
-    if (!safeInfo?.address) return '#';
-    return `https://app.safe.global/transactions/queue?safe=basesep:${safeInfo.address}`;
+    if (!safeAddress) return '#';
+    return `https://app.safe.global/transactions/queue?safe=basesep:${safeAddress}`;
   };
 
   return (
@@ -66,23 +127,36 @@ export default function PendingVotesPage() {
         <div>
           <h1 className="text-2xl font-bold text-governance-100">Pending Votes</h1>
           <p className="text-governance-400 mt-1">
-            Review and approve governance transactions
+            Review, sign, and execute governance transactions
           </p>
         </div>
         <div className="flex gap-3">
+          {transactions.length > 0 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              disabled={clearAllMutation.isPending}
+              className="btn-secondary flex items-center gap-2 text-danger hover:bg-danger/10"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear All
+            </button>
+          )}
           <button
-            onClick={() => syncMutation.mutate()}
+            onClick={() => {
+              syncMutation.mutate();
+              refetch();
+            }}
             disabled={syncMutation.isPending}
             className="btn-secondary flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            Sync Status
+            Refresh
           </button>
           <a
             href={getSafeUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary flex items-center gap-2"
+            className="btn-secondary flex items-center gap-2"
           >
             Open Safe
             <ExternalLink className="w-4 h-4" />
@@ -90,18 +164,85 @@ export default function PendingVotesPage() {
         </div>
       </div>
 
-      {/* Info Banner */}
-      <div className="card p-4 bg-accent/5 border-accent/20">
-        <div className="flex items-start gap-3">
-          <Vote className="w-5 h-5 text-accent mt-0.5" />
-          <div>
-            <p className="text-sm text-governance-200">
-              Transactions require {threshold} signature{threshold !== 1 ? 's' : ''} to execute.
-              Click "Vote in Safe" to approve a transaction.
+      {/* Clear All Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-governance-100 mb-2">
+              Clear All Pending Transactions?
+            </h3>
+            <p className="text-governance-400 mb-4">
+              This will mark all pending transaction(s) as rejected in our database.
+              Use this to clean up stale transactions.
             </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="btn-secondary"
+                disabled={clearAllMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => clearAllMutation.mutate()}
+                className="btn-primary bg-danger hover:bg-danger/80"
+                disabled={clearAllMutation.isPending}
+              >
+                {clearAllMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Clearing...
+                  </>
+                ) : (
+                  'Clear All'
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Wallet Status Banner */}
+      {!address && (
+        <div className="card p-4 bg-warning/10 border-warning/20">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
+            <div>
+              <p className="text-sm text-governance-200">
+                Connect your wallet to sign or execute transactions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {address && !isOwner() && (
+        <div className="card p-4 bg-warning/10 border-warning/20">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
+            <div>
+              <p className="text-sm text-governance-200">
+                Your wallet ({address.slice(0, 6)}...{address.slice(-4)}) is not a Safe owner. 
+                You can view transactions but cannot sign or execute them.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {address && isOwner() && (
+        <div className="card p-4 bg-accent/5 border-accent/20">
+          <div className="flex items-start gap-3">
+            <Vote className="w-5 h-5 text-accent mt-0.5" />
+            <div>
+              <p className="text-sm text-governance-200">
+                Connected as Safe owner. Transactions require {threshold} of {safeOwners.length} signatures.
+                Click "Sign" to add your signature, or "Execute" when enough signatures are collected.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading && (
@@ -134,15 +275,62 @@ export default function PendingVotesPage() {
         </div>
       )}
 
-      {/* Transactions List */}
-      {!isLoading && transactions.length > 0 && (
+      {/* Executable Transactions (current nonce) */}
+      {!isLoading && executableTxs.length > 0 && (
         <div className="space-y-4">
-          {transactions.map((tx) => (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-governance-200">
+              Ready to Process (Nonce {currentNonce})
+            </h2>
+            {executableTxs.length > 1 && (
+              <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">
+                {executableTxs.length} conflicting - only 1 can execute
+              </span>
+            )}
+          </div>
+          
+          {executableTxs.map((tx) => (
             <TransactionCard
               key={tx.safeTxHash}
               transaction={tx}
               threshold={threshold}
-              safeAddress={safeInfo?.address}
+              safeAddress={safeAddress}
+              onConfirm={confirmTransaction}
+              onExecute={executeTransaction}
+              canSign={isOwner() && !hasAlreadySigned(tx)}
+              hasSigned={hasAlreadySigned(tx)}
+              isConfirming={isConfirming}
+              isExecuting={isExecuting}
+              onRefresh={refetch}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Queued Transactions (future nonces) */}
+      {!isLoading && queuedTxs.length > 0 && (
+        <div className="space-y-4 mt-8">
+          <h2 className="text-lg font-semibold text-governance-200">
+            Queued (Waiting for earlier transactions)
+          </h2>
+          <p className="text-sm text-governance-400 -mt-2">
+            These transactions have higher nonces and can only be executed after the current nonce transactions.
+          </p>
+          
+          {queuedTxs.map((tx) => (
+            <TransactionCard
+              key={tx.safeTxHash}
+              transaction={tx}
+              threshold={threshold}
+              safeAddress={safeAddress}
+              onConfirm={confirmTransaction}
+              onExecute={executeTransaction}
+              canSign={isOwner() && !hasAlreadySigned(tx)}
+              hasSigned={hasAlreadySigned(tx)}
+              isConfirming={isConfirming}
+              isExecuting={isExecuting}
+              isQueued={true}
+              onRefresh={refetch}
             />
           ))}
         </div>
@@ -151,16 +339,41 @@ export default function PendingVotesPage() {
   );
 }
 
+interface ExtendedSafeTx extends SafePendingTransaction {
+  title: string;
+  description?: string | null;
+  actionType: string;
+  metadata: Record<string, unknown>;
+}
+
 function TransactionCard({
   transaction,
   threshold,
   safeAddress,
+  onConfirm,
+  onExecute,
+  canSign,
+  hasSigned,
+  isConfirming,
+  isExecuting,
+  isQueued = false,
+  onRefresh,
 }: {
-  transaction: PendingTransaction;
+  transaction: ExtendedSafeTx;
   threshold: number;
-  safeAddress?: string;
+  safeAddress?: string | null;
+  onConfirm: (safeTxHash: string) => Promise<{ success: boolean; error?: string }>;
+  onExecute: (tx: SafePendingTransaction) => Promise<{ success: boolean; txHash?: string; error?: string }>;
+  canSign: boolean;
+  hasSigned: boolean;
+  isConfirming: boolean;
+  isExecuting: boolean;
+  isQueued?: boolean;
+  onRefresh: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
   
   const config = ACTION_CONFIG[transaction.actionType] || {
     icon: Vote,
@@ -169,9 +382,37 @@ function TransactionCard({
   };
   const Icon = config.icon;
 
-  const confirmations = transaction.confirmations ?? 0;
+  const confirmations = transaction.confirmations?.length ?? 0;
   const remaining = threshold - confirmations;
   const progress = Math.min((confirmations / threshold) * 100, 100);
+  const canExecute = remaining <= 0;
+
+  const handleSign = async () => {
+    setActionError(null);
+    setActionInProgress(true);
+    const result = await onConfirm(transaction.safeTxHash);
+    setActionInProgress(false);
+    
+    if (result.success) {
+      onRefresh();
+    } else {
+      setActionError(result.error || 'Failed to sign');
+    }
+  };
+
+  const handleExecute = async () => {
+    setActionError(null);
+    setActionInProgress(true);
+    const result = await onExecute(transaction);
+    setActionInProgress(false);
+    
+    if (result.success) {
+      alert(`Transaction executed successfully!\nTx Hash: ${result.txHash}`);
+      onRefresh();
+    } else {
+      setActionError(result.error || 'Failed to execute');
+    }
+  };
 
   const getSafeTxUrl = () => {
     if (!safeAddress) return '#';
@@ -179,7 +420,7 @@ function TransactionCard({
   };
 
   return (
-    <div className="card p-5">
+    <div className={`card p-5 ${isQueued ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-4">
         {/* Icon */}
         <div className={`w-12 h-12 rounded-xl bg-governance-800 flex items-center justify-center ${config.color}`}>
@@ -190,9 +431,14 @@ function TransactionCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className={`text-xs font-medium ${config.color}`}>
-                {config.label}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium ${config.color}`}>
+                  {config.label}
+                </span>
+                <span className="text-xs text-governance-500">
+                  Nonce #{transaction.nonce}
+                </span>
+              </div>
               <h3 className="font-medium text-governance-100 mt-0.5">
                 {transaction.title}
               </h3>
@@ -203,17 +449,62 @@ function TransactionCard({
               )}
             </div>
 
-            {/* Vote Button */}
-            <a
-              href={getSafeTxUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary flex items-center gap-2 shrink-0"
-            >
-              <Vote className="w-4 h-4" />
-              Vote in Safe
-            </a>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {canSign && !isQueued && (
+                <button
+                  onClick={handleSign}
+                  disabled={actionInProgress || isConfirming}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {actionInProgress && isConfirming ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <PenLine className="w-4 h-4" />
+                  )}
+                  Sign
+                </button>
+              )}
+              
+              {hasSigned && !canExecute && (
+                <span className="text-xs text-success bg-success/10 px-2 py-1 rounded">
+                  ✓ Signed
+                </span>
+              )}
+              
+              {canExecute && !isQueued && (
+                <button
+                  onClick={handleExecute}
+                  disabled={actionInProgress || isExecuting}
+                  className="btn-primary bg-success hover:bg-success/80 flex items-center gap-2"
+                >
+                  {actionInProgress && isExecuting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  Execute
+                </button>
+              )}
+
+              <a
+                href={getSafeTxUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary flex items-center gap-2"
+                title="View in Safe"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
           </div>
+
+          {/* Error Display */}
+          {actionError && (
+            <div className="mt-3 p-2 bg-danger/10 border border-danger/20 rounded text-sm text-danger">
+              {actionError}
+            </div>
+          )}
 
           {/* Progress */}
           <div className="mt-4">
@@ -242,35 +533,63 @@ function TransactionCard({
             </div>
           </div>
 
+          {/* Signers List */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {transaction.confirmations?.map((conf) => (
+              <span
+                key={conf.owner}
+                className="text-xs bg-governance-800 px-2 py-1 rounded"
+                title={conf.owner}
+              >
+                {conf.owner.slice(0, 6)}...{conf.owner.slice(-4)} ✓
+              </span>
+            ))}
+          </div>
+
           {/* Meta */}
           <div className="flex items-center gap-4 mt-3 text-xs text-governance-500">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
-              {formatDistanceToNow(new Date(transaction.proposedAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(transaction.submissionDate), { addSuffix: true })}
             </span>
             <span>
-              by {transaction.proposedBy.slice(0, 6)}...{transaction.proposedBy.slice(-4)}
+              by {transaction.proposer.slice(0, 6)}...{transaction.proposer.slice(-4)}
             </span>
           </div>
 
           {/* Expandable Details */}
-          {Object.keys(transaction.metadata || {}).length > 0 && (
-            <div className="mt-3">
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-xs text-accent hover:underline"
-              >
-                {expanded ? 'Hide details' : 'Show details'}
-              </button>
-              {expanded && (
-                <div className="mt-2 p-3 bg-governance-800/50 rounded-lg">
-                  <pre className="text-xs text-governance-300 overflow-auto">
-                    {JSON.stringify(transaction.metadata, null, 2)}
-                  </pre>
+          <div className="mt-3">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs text-accent hover:underline"
+            >
+              {expanded ? 'Hide details' : 'Show details'}
+            </button>
+            {expanded && (
+              <div className="mt-2 p-3 bg-governance-800/50 rounded-lg space-y-2">
+                <div className="text-xs">
+                  <span className="text-governance-500">Safe TX Hash:</span>
+                  <span className="text-governance-300 ml-2 font-mono break-all">{transaction.safeTxHash}</span>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="text-xs">
+                  <span className="text-governance-500">Target:</span>
+                  <span className="text-governance-300 ml-2 font-mono">{transaction.to}</span>
+                </div>
+                <div className="text-xs">
+                  <span className="text-governance-500">Data:</span>
+                  <span className="text-governance-300 ml-2 font-mono break-all">{transaction.data.slice(0, 66)}...</span>
+                </div>
+                {Object.keys(transaction.metadata || {}).length > 0 && (
+                  <div className="text-xs">
+                    <span className="text-governance-500">Metadata:</span>
+                    <pre className="text-governance-300 mt-1 overflow-auto">
+                      {JSON.stringify(transaction.metadata, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

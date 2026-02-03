@@ -23,8 +23,8 @@ const RULING_EXECUTOR_ADDRESS = process.env.RULING_EXECUTOR_ADDRESS as Address;
 // ============================================================================
 
 const claimsManagerABI = parseAbi([
-  // View functions
-  'function getClaim(uint256 claimId) view returns ((uint256 claimId, uint256 agentId, address claimant, uint256 claimedAmount, uint256 approvedAmount, bytes32 evidenceHash, string evidenceUri, bytes32 paymentReceiptHash, bytes32 termsHashAtClaimTime, uint256 termsVersionAtClaimTime, address providerAtClaimTime, bytes32 councilId, uint256 claimantDeposit, uint256 lockedCollateral, uint8 status, uint256 filedAt, uint256 evidenceDeadline, uint256 votingDeadline, bool hadVotes))',
+  // View functions (v1.3 - evidenceHash and evidenceUri removed from Claim struct)
+  'function getClaim(uint256 claimId) view returns ((uint256 claimId, uint256 agentId, address claimant, uint256 claimedAmount, uint256 approvedAmount, bytes32 paymentReceiptHash, bytes32 termsHashAtClaimTime, uint256 termsVersionAtClaimTime, address providerAtClaimTime, bytes32 councilId, uint256 claimantDeposit, uint256 lockedCollateral, uint8 status, uint256 filedAt, uint256 evidenceDeadline, uint256 votingDeadline, bool hadVotes))',
   'function getClaimsByCouncil(bytes32 councilId) view returns (uint256[])',
   'function getPendingClaimsByCouncil(bytes32 councilId) view returns (uint256[])',
   'function getClaimsByClaimant(address claimant) view returns (uint256[])',
@@ -38,9 +38,8 @@ const claimsManagerABI = parseAbi([
   'function nextClaimId() view returns (uint256)',
   'function getClaimStats(uint256 agentId) view returns ((uint256 totalClaims, uint256 approvedClaims, uint256 rejectedClaims, uint256 pendingClaims, uint256 expiredClaims, uint256 totalPaidOut))',
   'function calculateMedianApprovedAmount(uint256 claimId) view returns (uint256)',
-  // Write functions (for tx data encoding)
-  'function fileClaim(uint256 agentId, uint256 claimedAmount, bytes32 evidenceHash, string evidenceUri, bytes32 paymentReceiptHash) returns (uint256)',
-  'function submitAdditionalEvidence(uint256 claimId, bytes32 evidenceHash, string evidenceUri)',
+  // Write functions (v1.3 - fileClaim only takes 3 params, submitAdditionalEvidence removed)
+  'function fileClaim(uint256 agentId, uint256 claimedAmount, bytes32 paymentReceiptHash) returns (uint256)',
   'function castVote(uint256 claimId, uint8 vote, uint256 approvedAmount, string reasoning)',
   'function changeVote(uint256 claimId, uint8 vote, uint256 approvedAmount, string reasoning)',
   'function finalizeClaim(uint256 claimId)',
@@ -89,8 +88,7 @@ interface ClaimResponse {
   claimant: string;
   claimedAmount: string;
   approvedAmount: string;
-  evidenceHash: string;
-  evidenceUri: string;
+  // v1.3: evidenceHash and evidenceUri removed (now in DB messages)
   paymentReceiptHash: string;
   termsHashAtClaimTime: string;
   termsVersionAtClaimTime: string;
@@ -147,8 +145,7 @@ function formatClaim(claim: any): ClaimResponse {
     claimant: claim.claimant,
     claimedAmount: claim.claimedAmount.toString(),
     approvedAmount: claim.approvedAmount.toString(),
-    evidenceHash: claim.evidenceHash,
-    evidenceUri: claim.evidenceUri,
+    // v1.3: evidenceHash and evidenceUri removed
     paymentReceiptHash: claim.paymentReceiptHash,
     termsHashAtClaimTime: claim.termsHashAtClaimTime,
     termsVersionAtClaimTime: claim.termsVersionAtClaimTime.toString(),
@@ -787,9 +784,10 @@ router.get('/:claimId/messages', async (req: Request, res: Response) => {
   try {
     const { claimId } = req.params;
     
+    // v1.3: evidence stored in DB as base64 data (evidence_data, evidence_mimetype)
     const result = await db.query(
       `SELECT id, claim_id, parent_id, author_address, author_role,
-              content, evidence_hash, evidence_uri, evidence_filename, evidence_size, created_at
+              content, evidence_hash, evidence_data, evidence_filename, evidence_mimetype, evidence_size, created_at
        FROM claim_messages
        WHERE claim_id = $1
        ORDER BY created_at ASC`,
@@ -836,8 +834,10 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
       content, 
       parentId,
       evidenceHash,
-      evidenceUri,
+      // v1.3: evidence stored as base64 in DB
+      evidenceData,
       evidenceFilename,
+      evidenceMimetype,
       evidenceSize
     } = req.body;
     
@@ -845,9 +845,14 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
     if (!authorAddress) {
       return res.status(400).json({ error: 'authorAddress is required' });
     }
-    if (!authorRole || !['claimer', 'provider', 'councilor'].includes(authorRole)) {
+    // v1.3: accept 'council' or 'councilor' for backwards compatibility
+    const validRoles = ['claimer', 'provider', 'council', 'councilor'];
+    if (!authorRole || !validRoles.includes(authorRole)) {
       return res.status(400).json({ error: 'authorRole must be claimer, provider, or councilor' });
     }
+    // Normalize 'council' to 'councilor' (frontend standard)
+    const normalizedRole = authorRole === 'council' ? 'councilor' : authorRole;
+    
     if (!content || content.trim().length === 0) {
       return res.status(400).json({ error: 'content is required' });
     }
@@ -857,9 +862,9 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Evidence file must be 10KB or less' });
     }
     
-    // Councilors cannot submit evidence
-    if (authorRole === 'councilor' && (evidenceHash || evidenceUri)) {
-      return res.status(403).json({ error: 'Councilors cannot submit evidence, only comments' });
+    // Council members cannot submit evidence
+    if (normalizedRole === 'councilor' && (evidenceHash || evidenceData)) {
+      return res.status(403).json({ error: 'Council members cannot submit evidence, only comments' });
     }
     
     // Verify the claim exists and check if evidence period is still open
@@ -883,7 +888,9 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
       if (status !== 0 || now >= evidenceDeadline) {
         return res.status(403).json({ 
           error: 'Conversation is locked. Evidence period has ended.',
-          evidenceDeadline: new Date(evidenceDeadline * 1000).toISOString()
+          evidenceDeadline: new Date(evidenceDeadline * 1000).toISOString(),
+          currentTime: new Date(now * 1000).toISOString(),
+          status: status
         });
       }
       
@@ -892,15 +899,15 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
       const providerAddress = claim.providerAtClaimTime.toLowerCase();
       const authorLower = authorAddress.toLowerCase();
       
-      if (authorRole === 'claimer' && authorLower !== claimantAddress) {
+      if (normalizedRole === 'claimer' && authorLower !== claimantAddress) {
         return res.status(403).json({ error: 'Only the claimant can post as claimer' });
       }
       
-      if (authorRole === 'provider' && authorLower !== providerAddress) {
+      if (normalizedRole === 'provider' && authorLower !== providerAddress) {
         return res.status(403).json({ error: 'Only the provider can post as provider' });
       }
       
-      if (authorRole === 'councilor') {
+      if (normalizedRole === 'councilor') {
         // Verify they are a council member
         const isMember = await publicClient.readContract({
           address: COUNCIL_REGISTRY_ADDRESS,
@@ -930,21 +937,22 @@ router.post('/:claimId/messages', async (req: Request, res: Response) => {
       }
     }
     
-    // Insert the message
+    // Insert the message (v1.3: use evidence_data and evidence_mimetype columns)
     const result = await db.query(
       `INSERT INTO claim_messages 
-       (claim_id, parent_id, author_address, author_role, content, evidence_hash, evidence_uri, evidence_filename, evidence_size)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       (claim_id, parent_id, author_address, author_role, content, evidence_hash, evidence_data, evidence_filename, evidence_mimetype, evidence_size)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         claimId,
         parentId || null,
         authorAddress.toLowerCase(),
-        authorRole,
+        normalizedRole,
         content.trim(),
         evidenceHash || null,
-        evidenceUri || null,
+        evidenceData || null,
         evidenceFilename || null,
+        evidenceMimetype || null,
         evidenceSize || null
       ]
     );
@@ -961,18 +969,18 @@ router.get('/:claimId/messages/:messageId', async (req: Request, res: Response) 
   try {
     const { claimId, messageId } = req.params;
     
-    // Get the message and all its descendants
+    // Get the message and all its descendants (v1.3: use evidence_data, evidence_mimetype)
     const result = await db.query(
       `WITH RECURSIVE message_tree AS (
          SELECT id, claim_id, parent_id, author_address, author_role,
-                content, evidence_hash, evidence_uri, evidence_filename, evidence_size, created_at, 0 as depth
+                content, evidence_hash, evidence_data, evidence_filename, evidence_mimetype, evidence_size, created_at, 0 as depth
          FROM claim_messages
          WHERE id = $1 AND claim_id = $2
          
          UNION ALL
          
          SELECT cm.id, cm.claim_id, cm.parent_id, cm.author_address, cm.author_role,
-                cm.content, cm.evidence_hash, cm.evidence_uri, cm.evidence_filename, cm.evidence_size, cm.created_at, mt.depth + 1
+                cm.content, cm.evidence_hash, cm.evidence_data, cm.evidence_filename, cm.evidence_mimetype, cm.evidence_size, cm.created_at, mt.depth + 1
          FROM claim_messages cm
          INNER JOIN message_tree mt ON cm.parent_id = mt.id
        )

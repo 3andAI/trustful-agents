@@ -208,6 +208,39 @@ router.delete('/:safeTxHash', requireAuth, async (req: AuthenticatedRequest, res
 });
 
 /**
+ * DELETE /pending/clear-all
+ * Mark all pending transactions as rejected (for cleanup after Safe rejections)
+ * Requires Safe owner authentication
+ */
+router.delete('/clear-all', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Get count before clearing
+    const countResult = await queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM pending_transactions WHERE status = 'pending'`
+    );
+    const count = parseInt(countResult?.count || '0', 10);
+
+    if (count === 0) {
+      return res.json({ success: true, cleared: 0, message: 'No pending transactions to clear' });
+    }
+
+    // Mark all pending as rejected
+    await query(
+      `UPDATE pending_transactions SET status = 'rejected' WHERE status = 'pending'`
+    );
+
+    res.json({ 
+      success: true, 
+      cleared: count,
+      message: `Cleared ${count} pending transaction(s)` 
+    });
+  } catch (error) {
+    console.error('Failed to clear pending transactions:', error);
+    res.status(500).json({ error: 'Failed to clear pending transactions' });
+  }
+});
+
+/**
  * POST /pending/sync
  * Sync pending transaction statuses with Safe API
  */

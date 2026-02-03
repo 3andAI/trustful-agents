@@ -312,6 +312,14 @@ export async function syncPendingTransactions(): Promise<{
   return apiRequest('/pending/sync', { method: 'POST' });
 }
 
+export async function clearAllPendingTransactions(): Promise<{
+  success: boolean;
+  cleared: number;
+  message: string;
+}> {
+  return apiRequest('/pending/clear-all', { method: 'DELETE' });
+}
+
 // ============================================================================
 // Agent Endpoints
 // ============================================================================

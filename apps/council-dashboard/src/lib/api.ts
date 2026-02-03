@@ -13,8 +13,7 @@ export interface Claim {
   claimant: string;
   claimedAmount: string;
   approvedAmount: string;
-  evidenceHash: string;
-  evidenceUri: string;
+  // v1.3: evidenceHash and evidenceUri removed (now stored in DB messages)
   paymentReceiptHash: string;
   termsHashAtClaimTime: string;
   termsVersionAtClaimTime: string;
@@ -251,4 +250,14 @@ export function getStatusBadge(status: string): string {
     default:
       return 'badge-neutral';
   }
+}
+
+// ============================================================================
+// v1.3 Evidence Helpers (DB-stored, not IPFS)
+// ============================================================================
+
+export const MAX_EVIDENCE_SIZE = 10240; // 10KB
+
+export function canDisplayInline(mimetype: string | null): boolean {
+  return mimetype ? mimetype.startsWith('image/') : false;
 }

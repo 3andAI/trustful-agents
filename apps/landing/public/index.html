@@ -103,6 +103,79 @@
       color: var(--surface-100);
     }
 
+    /* Dropdown */
+    .dropdown {
+      position: relative;
+    }
+
+    .dropdown-toggle {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .dropdown-toggle svg {
+      transition: transform 0.2s;
+    }
+
+    .dropdown:hover .dropdown-toggle svg {
+      transform: rotate(180deg);
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--surface-700);
+      border-radius: 12px;
+      padding: 8px;
+      min-width: 200px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      z-index: 100;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .dropdown:hover .dropdown-menu {
+      opacity: 1;
+      visibility: visible;
+      margin-top: 8px;
+    }
+
+    .dropdown-menu::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 8px solid transparent;
+      border-bottom-color: var(--surface-700);
+    }
+
+    .dropdown-menu a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .dropdown-menu a:hover {
+      background: var(--surface-800);
+    }
+
+    .dropdown-menu .icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
     /* Hero */
     .hero {
       padding: 80px 0;
@@ -330,7 +403,20 @@
           <div class="logo-text">Trustful <span>Agents</span></div>
         </a>
         <nav class="header-links">
-          <a href="https://docs.trustful-agents.ai" target="_blank">Docs</a>
+          <div class="dropdown">
+            <span class="dropdown-toggle">
+              Docs
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </span>
+            <div class="dropdown-menu">
+              <a href="/docs/how-it-works.html"><span class="icon">📖</span> User Documentation</a>
+              <a href="/docs/developer.html"><span class="icon">💻</span> Developer Documentation</a>
+              <a href="/docs/whitepaper.html"><span class="icon">📄</span> Whitepaper</a>
+              <a href="/docs/related-work.html"><span class="icon">🔗</span> Related Work</a>
+            </div>
+          </div>
           <a href="https://github.com/3andAI/trustful-agents" target="_blank">GitHub</a>
           <a href="https://sepolia.basescan.org/address/0xe75817D8aADA91968AD492d583602Ec10B2569a6" target="_blank">Contracts</a>
         </nav>
@@ -439,7 +525,7 @@
     <div class="container">
       <p>
         Built by <a href="https://github.com/3andAI" target="_blank">3andAI</a> · 
-        <a href="https://docs.trustful-agents.ai" target="_blank">Documentation</a> · 
+        <a href="/docs/developer.html">Documentation</a> · 
         <a href="https://github.com/3andAI/trustful-agents" target="_blank">GitHub</a>
       </p>
     </div>

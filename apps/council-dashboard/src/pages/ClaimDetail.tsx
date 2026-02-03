@@ -5,7 +5,6 @@ import {
   User,
   Bot,
   FileText,
-  ExternalLink,
   CheckCircle,
   XCircle,
   MinusCircle,
@@ -280,33 +279,18 @@ export default function ClaimDetailPage() {
                 </div>
               </div>
 
-              {/* Evidence */}
-              <div className="flex items-start gap-3">
-                <FileText className="w-5 h-5 text-governance-500 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm text-governance-500">Evidence</p>
-                  {claim.evidenceUri ? (
-                    <a
-                      href={claim.evidenceUri.startsWith('ipfs://') 
-                        ? `https://gateway.pinata.cloud/ipfs/${claim.evidenceUri.replace('ipfs://', '')}`
-                        : claim.evidenceUri
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-council hover:text-council-light flex items-center gap-1"
-                    >
-                      View Evidence <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : (
-                    <span className="text-governance-500">No evidence URI provided</span>
-                  )}
-                  {claim.evidenceHash && (
-                    <p className="text-xs text-governance-500 font-mono mt-1">
-                      Hash: {claim.evidenceHash.slice(0, 20)}...
+              {/* Payment Receipt Hash (if provided) */}
+              {claim.paymentReceiptHash && claim.paymentReceiptHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-governance-500 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-governance-500">Payment Receipt Hash</p>
+                    <p className="text-xs text-governance-400 font-mono mt-1 break-all">
+                      {claim.paymentReceiptHash}
                     </p>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

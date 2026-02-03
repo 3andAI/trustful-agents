@@ -11,11 +11,11 @@ const router = Router();
 // ============================================================================
 
 const CONTRACTS = {
-  trustfulValidator: '0xe75817D8aADA91968AD492d583602Ec10B2569a6',
-  collateralVault: '0xDDC4eebCf1D6e62821A25Fa26B6Df021dcee11C4',
-  termsRegistry: '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d',
-  councilRegistry: '0x54996FAE14f35C32EfA2F0f92237e9B924a93F66',
-  erc8004Registry: '0xb3B4b5042Fd3600404846671Ff5558719860b694',
+  trustfulValidator: '0x9628C1bD875C3378B14f0108b60B0b5739fE92E8',
+  collateralVault: '0xC948389425061c2C960c034c1c9526E9E6f39ff9',
+  termsRegistry: '0xBDc5328D4442A1e893CD2b1F75d3F64a3e50f923',
+  councilRegistry: '0xAaA608c80168D90d77Ec5a7f72Fb939E7Add5C32',
+  erc8004Registry: '0x454909C7551158e12a6a5192dEB359dDF067ec80',
 } as const;
 
 // Simple ABIs for the functions we need
@@ -29,7 +29,7 @@ const TrustfulValidatorAbi = [
   },
   {
     type: 'function',
-    name: 'getValidation',
+    name: 'getValidationRecord',
     inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [
       {
@@ -128,9 +128,9 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
       client.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
-        functionName: 'getValidation',
+        functionName: 'getValidationRecord',
         args: [BigInt(agentId)],
-      }).catch((err) => { console.log('getValidation error:', err); return null; }),
+      }).catch((err) => { console.log('getValidationRecord error:', err); return null; }),
       client.readContract({
         address: CONTRACTS.collateralVault,
         abi: CollateralVaultAbi,
@@ -362,7 +362,7 @@ router.get('/agents/:agentId/trust-info.json', async (req: Request, res: Respons
       client.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
-        functionName: 'getValidation',
+        functionName: 'getValidationRecord',
         args: [BigInt(agentId)],
       }).catch(() => null),
       client.readContract({

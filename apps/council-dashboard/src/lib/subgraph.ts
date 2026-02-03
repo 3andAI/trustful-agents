@@ -2,7 +2,7 @@
 // Fetches voting history and deposit earnings
 
 const SUBGRAPH_URL = import.meta.env.VITE_SUBGRAPH_URL || 
-  'https://api.studio.thegraph.com/query/1723244/trustful-agents/v0.1'
+  'https://api.studio.thegraph.com/query/1723244/trustful-agents/v1.3.1'
 
 // =============================================================================
 // Types

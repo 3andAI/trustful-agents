@@ -28,7 +28,8 @@ import {
   hashFile, 
   formatAddress,
   getAgentDisplayName,
-  uploadToIPFS,
+  fileToBase64DataUri,
+  MAX_EVIDENCE_SIZE,
   type AgentMetadata
 } from '../lib/api'
 import { 
@@ -54,11 +55,8 @@ export default function FileClaim() {
   const [claimedAmount, setClaimedAmount] = useState('')
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
   const [evidenceHash, setEvidenceHash] = useState('')
-  const [evidenceUri, setEvidenceUri] = useState('')
   const [paymentReceiptHash] = useState('')
   const [description, setDescription] = useState('')
-  const [uploadingEvidence, setUploadingEvidence] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
   
   // Agent lookup state
   const [agents, setAgents] = useState<SubgraphAgent[]>([])
@@ -254,18 +252,13 @@ export default function FileClaim() {
     }
   }, [approveSuccess])
 
-  // After claim succeeds, save metadata and redirect
+  // After claim succeeds, save metadata and evidence to DB
   useEffect(() => {
-    if (claimSuccess && claimReceipt && description) {
-      console.log('Claim successful, attempting to save metadata...')
+    if (claimSuccess && claimReceipt) {
+      console.log('Claim successful, saving to database...')
       
-      // ClaimFiled event topic - from actual contract events
-      // This is the keccak256 hash of the actual event signature in the deployed contract
       const CLAIM_FILED_TOPIC = '0x06f7262d6b8a70cc3597bdcd5bccc0324b8bad2b73b9974502b3b9f8e25c9be5'
       const claimsManagerAddress = CONTRACTS.CLAIMS_MANAGER.toLowerCase()
-      
-      console.log('ClaimsManager address:', claimsManagerAddress)
-      console.log('Looking for ClaimFiled topic:', CLAIM_FILED_TOPIC)
       
       const claimFiledLog = claimReceipt.logs.find(log => 
         log.address.toLowerCase() === claimsManagerAddress &&
@@ -273,19 +266,15 @@ export default function FileClaim() {
         log.topics[0]?.toLowerCase() === CLAIM_FILED_TOPIC.toLowerCase()
       )
       
-      console.log('Found ClaimFiled log:', claimFiledLog)
-      
       if (claimFiledLog && claimFiledLog.topics[1]) {
         const claimId = BigInt(claimFiledLog.topics[1]).toString()
         console.log('Extracted claimId:', claimId)
         
         setSavingMetadata(true)
-        
-        // Save metadata to API
         const apiBase = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || 'https://api.trustful-agents.ai')
-        console.log('Saving metadata to:', `${apiBase}/claims/${claimId}/metadata`)
         
-        fetch(`${apiBase}/claims/${claimId}/metadata`, {
+        // Save metadata
+        const saveMetadata = fetch(`${apiBase}/claims/${claimId}/metadata`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -293,57 +282,45 @@ export default function FileClaim() {
             description: description
           })
         })
-        .then(async (res) => {
-          if (!res.ok) {
-            const errorText = await res.text()
-            console.error('Metadata save failed:', res.status, errorText)
-          } else {
-            console.log('Metadata saved successfully for claim', claimId)
-          }
-        })
-        .catch(err => {
-          console.error('Failed to save metadata:', err)
-        })
-        .finally(() => {
-          setSavingMetadata(false)
-          navigate('/')
-        })
+        
+        // If there's an evidence file, post it as the initial message
+        const saveEvidence = (evidenceFile && address) 
+          ? fileToBase64DataUri(evidenceFile).then(evidenceData =>
+              fetch(`${apiBase}/claims/${claimId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  authorAddress: address,
+                  authorRole: 'claimer',
+                  content: description,
+                  evidenceHash: evidenceHash || null,
+                  evidenceData: evidenceData,
+                  evidenceFilename: evidenceFile.name,
+                  evidenceMimetype: evidenceFile.type,
+                  evidenceSize: evidenceFile.size
+                })
+              })
+            )
+          : Promise.resolve()
+        
+        Promise.all([saveMetadata, saveEvidence])
+          .catch(err => console.error('Failed to save to database:', err))
+          .finally(() => {
+            setSavingMetadata(false)
+            navigate('/')
+          })
       } else {
-        // Couldn't parse claimId, just navigate
         console.warn('Could not find ClaimFiled event in logs')
-        console.log('All logs:', claimReceipt.logs.map(l => ({ 
-          address: l.address, 
-          topics: l.topics 
-        })))
         navigate('/')
       }
-    } else if (claimSuccess && !description) {
-      // No description to save, just navigate
-      console.log('Claim successful but no description to save')
-      navigate('/')
     }
-  }, [claimSuccess, claimReceipt, description, agentId, navigate])
+  }, [claimSuccess, claimReceipt, description, agentId, navigate, evidenceFile, evidenceHash, address])
 
   // Hash and upload evidence file when selected
+  // Hash evidence file when selected (no IPFS upload in v1.3)
   useEffect(() => {
     if (evidenceFile) {
-      // Hash the file (keccak256 - this is the bytes32 hash for the contract)
       hashFile(evidenceFile).then(setEvidenceHash)
-      
-      // Upload to IPFS
-      setUploadingEvidence(true)
-      setUploadError(null)
-      uploadToIPFS(evidenceFile)
-        .then(result => {
-          if (result) {
-            // Only set the URI, don't overwrite the evidenceHash
-            // evidenceHash should remain the keccak256 hash for the contract
-            setEvidenceUri(result.uri)
-          } else {
-            setUploadError('Failed to upload to IPFS. You can still provide a manual URI below.')
-          }
-        })
-        .finally(() => setUploadingEvidence(false))
     }
   }, [evidenceFile])
 
@@ -357,12 +334,10 @@ export default function FileClaim() {
     })
   }
 
+  // v1.3: fileClaim only takes 3 params - evidence is stored in DB separately
   const handleFileClaim = () => {
     if (!agentId || !claimedAmount) return
     
-    // Use provided URI, or create a placeholder hash-based identifier
-    const finalEvidenceUri = evidenceUri || (evidenceHash ? `hash://${evidenceHash}` : '')
-    const finalEvidenceHash = evidenceHash || keccak256(toBytes(description || 'no-evidence'))
     const paymentHash = paymentReceiptHash || keccak256(toBytes('no-payment-receipt'))
     
     fileClaim({
@@ -372,8 +347,6 @@ export default function FileClaim() {
       args: [
         BigInt(agentId),
         parseUSDC(claimedAmount),
-        finalEvidenceHash as `0x${string}`,
-        finalEvidenceUri,
         paymentHash as `0x${string}`
       ]
     })
@@ -386,7 +359,7 @@ export default function FileClaim() {
   const canProceed = {
     agent: agentId && selectedAgent && isValidated,
     amount: claimedAmount && parseFloat(claimedAmount) > 0 && requiredDeposit && !exceedsAvailable,
-    evidence: (evidenceHash || evidenceUri) && description,
+    evidence: description.trim().length > 0,  // v1.3: just need description
     review: true,
     submit: !needsApproval
   }
@@ -679,75 +652,47 @@ export default function FileClaim() {
 
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-2">
-                  Evidence File *
+                  Evidence File (Optional)
                 </label>
-                <div className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                  uploadingEvidence ? 'border-claimer/50 bg-claimer/5' : 'border-surface-600'
-                }`}>
+                <div className="border-2 border-dashed rounded-lg p-6 text-center border-surface-600">
                   <input
                     type="file"
                     onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
                     className="hidden"
                     id="evidence-upload"
-                    disabled={uploadingEvidence}
                   />
-                  <label htmlFor="evidence-upload" className={uploadingEvidence ? '' : 'cursor-pointer'}>
-                    {uploadingEvidence ? (
-                      <>
-                        <Loader2 className="w-8 h-8 text-claimer mx-auto mb-2 animate-spin" />
-                        <p className="text-surface-300">Uploading to IPFS...</p>
-                        <p className="text-sm text-surface-500">{evidenceFile?.name}</p>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-8 h-8 text-surface-400 mx-auto mb-2" />
-                        <p className="text-surface-300">
-                          {evidenceFile ? evidenceFile.name : 'Click to upload evidence'}
-                        </p>
-                        <p className="text-sm text-surface-500">
-                          Screenshots, documents, logs, etc.
-                        </p>
-                      </>
-                    )}
+                  <label htmlFor="evidence-upload" className="cursor-pointer">
+                    <Upload className="w-8 h-8 text-surface-400 mx-auto mb-2" />
+                    <p className="text-surface-300">
+                      {evidenceFile ? evidenceFile.name : 'Click to upload evidence'}
+                    </p>
+                    <p className="text-sm text-surface-500">
+                      Max {MAX_EVIDENCE_SIZE / 1024}KB - Screenshots, documents, logs
+                    </p>
                   </label>
                 </div>
                 
-                {/* Upload success */}
-                {evidenceUri && evidenceUri.startsWith('ipfs://') && !uploadingEvidence && (
-                  <div className="mt-2 p-2 bg-accent/10 border border-accent/20 rounded flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-accent" />
-                    <span className="text-sm text-accent">Uploaded to IPFS</span>
+                {/* File size warning */}
+                {evidenceFile && evidenceFile.size > MAX_EVIDENCE_SIZE && (
+                  <div className="mt-2 p-2 bg-danger/10 border border-danger/20 rounded">
+                    <p className="text-sm text-danger">
+                      File too large ({(evidenceFile.size / 1024).toFixed(1)}KB). Maximum is {MAX_EVIDENCE_SIZE / 1024}KB.
+                    </p>
                   </div>
                 )}
                 
-                {/* Upload error */}
-                {uploadError && (
-                  <div className="mt-2 p-2 bg-danger/10 border border-danger/20 rounded">
-                    <p className="text-sm text-danger">{uploadError}</p>
+                {/* File selected success */}
+                {evidenceFile && evidenceFile.size <= MAX_EVIDENCE_SIZE && (
+                  <div className="mt-2 p-2 bg-accent/10 border border-accent/20 rounded flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-accent" />
+                    <span className="text-sm text-accent">File ready ({(evidenceFile.size / 1024).toFixed(1)}KB)</span>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-2">
-                  Evidence URI (IPFS/HTTP)
-                </label>
-                <input
-                  type="text"
-                  value={evidenceUri}
-                  onChange={(e) => setEvidenceUri(e.target.value)}
-                  placeholder="ipfs://Qm... or https://..."
-                  className="input"
-                  readOnly={uploadingEvidence}
-                />
-                <p className="text-xs text-surface-500 mt-1">
-                  {evidenceFile ? 'Auto-filled from upload. You can edit if needed.' : 'Or provide a direct link to your evidence'}
-                </p>
               </div>
 
               {evidenceHash && (
                 <div className="p-3 bg-surface-800 rounded-lg">
-                  <p className="text-xs text-surface-500">Evidence Hash</p>
+                  <p className="text-xs text-surface-500">Evidence Hash (SHA-256)</p>
                   <p className="text-sm text-surface-300 font-mono break-all">{evidenceHash}</p>
                 </div>
               )}
@@ -761,7 +706,7 @@ export default function FileClaim() {
             </button>
             <button
               onClick={() => setStep('review')}
-              disabled={!canProceed.evidence || uploadingEvidence}
+              disabled={!canProceed.evidence || (evidenceFile !== null && evidenceFile.size > MAX_EVIDENCE_SIZE)}
               className="btn btn-primary"
             >
               Continue
@@ -800,7 +745,7 @@ export default function FileClaim() {
                 <div className="col-span-2">
                   <p className="text-surface-500 text-sm">Evidence</p>
                   <p className="text-surface-100 truncate">
-                    {evidenceFile?.name || evidenceUri || 'Provided'}
+                    {evidenceFile?.name || 'No file attached'}
                   </p>
                 </div>
                 <div className="col-span-2">

@@ -1,0 +1,2918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Specification v1.3 - Trustful Agents</title>
+  <meta name="description" content="Comprehensive architecture specification for Trustful Agents v1.3 - Decentralized Trust Layer for AI Agents">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --surface-100: #f8fafc;
+      --surface-200: #e2e8f0;
+      --surface-300: #cbd5e1;
+      --surface-400: #94a3b8;
+      --surface-500: #64748b;
+      --surface-600: #475569;
+      --surface-700: #334155;
+      --surface-800: #1e293b;
+      --accent: #3b82f6;
+      --accent-light: #60a5fa;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --sidebar-width: 280px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--surface-200);
+      line-height: 1.7;
+    }
+
+    /* Header */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--surface-800);
+      z-index: 100;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--surface-100);
+    }
+
+    .logo-text span {
+      color: var(--surface-400);
+      font-weight: 400;
+    }
+
+    .header-links {
+      display: flex;
+      gap: 20px;
+    }
+
+    .header-links a {
+      color: var(--surface-400);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s;
+    }
+
+    .header-links a:hover {
+      color: var(--surface-100);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 64px;
+      left: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - 64px);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--surface-800);
+      overflow-y: auto;
+      padding: 20px 0;
+      z-index: 50;
+    }
+
+    .sidebar-title {
+      padding: 0 20px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--surface-500);
+      border-bottom: 1px solid var(--surface-800);
+      margin-bottom: 12px;
+    }
+
+    .toc {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toc a {
+      padding: 8px 20px;
+      color: var(--surface-400);
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.2s;
+      border-left: 2px solid transparent;
+    }
+
+    .toc a:hover {
+      color: var(--surface-100);
+      background: var(--bg-card);
+    }
+
+    .toc a.active {
+      color: var(--accent-light);
+      border-left-color: var(--accent);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .toc a.toc-h2 {
+      padding-left: 32px;
+      font-size: 12px;
+    }
+
+    /* Main content */
+    .main {
+      margin-left: var(--sidebar-width);
+      padding: 64px 0 0;
+      min-height: 100vh;
+    }
+
+    .content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 48px 80px;
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--surface-100);
+      margin-bottom: 8px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--surface-800);
+    }
+
+    h2 {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--surface-100);
+      margin: 48px 0 20px;
+      padding-top: 24px;
+      border-top: 1px solid var(--surface-800);
+    }
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--surface-100);
+      margin: 32px 0 16px;
+    }
+
+    h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--surface-200);
+      margin: 24px 0 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: var(--surface-300);
+    }
+
+    strong {
+      color: var(--surface-100);
+      font-weight: 600;
+    }
+
+    a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 0 0 20px 24px;
+      color: var(--surface-300);
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    li > ul, li > ol {
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    /* Code */
+    code {
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent-light);
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-800);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: var(--surface-200);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--bg-card);
+      color: var(--surface-100);
+      font-weight: 600;
+      text-align: left;
+      padding: 12px 16px;
+      border: 1px solid var(--surface-800);
+    }
+
+    td {
+      padding: 12px 16px;
+      border: 1px solid var(--surface-800);
+      color: var(--surface-300);
+    }
+
+    tr:nth-child(even) {
+      background: var(--bg-secondary);
+    }
+
+    /* Blockquotes */
+    blockquote {
+      border-left: 3px solid var(--accent);
+      margin: 20px 0;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border-radius: 0 8px 8px 0;
+    }
+
+    blockquote p {
+      margin: 0;
+      color: var(--surface-300);
+    }
+
+    /* Horizontal rules */
+    hr {
+      border: none;
+      border-top: 1px solid var(--surface-800);
+      margin: 32px 0;
+    }
+
+    /* Mobile toggle */
+    .mobile-toggle {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      border: none;
+      border-radius: 50%;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 200;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Version badge */
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--surface-700);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--surface-300);
+      margin-bottom: 24px;
+    }
+
+    .version-badge .dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main {
+        margin-left: 0;
+      }
+
+      .content {
+        padding: 32px 24px 80px;
+      }
+
+      .mobile-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      h2 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="logo">
+      <div class="logo-icon">🤖</div>
+      <div class="logo-text">Trustful <span>Agents</span></div>
+    </a>
+    <div class="header-links">
+      <a href="/docs/developer.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Developer Docs
+      </a>
+      <a href="/">Home</a>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-title">Table of Contents</div>
+    <nav class="toc">
+      <a href="#trustful-agents-architecture-specification" class="toc-h1">Trustful Agents Architecture Specification</a>
+<a href="#document-history" class="toc-h2">Document History</a>
+<a href="#table-of-contents" class="toc-h2">Table of Contents</a>
+<a href="#1executive-summary" class="toc-h2">1. Executive Summary</a>
+<a href="#2requirements" class="toc-h2">2. Requirements</a>
+<a href="#3assumptions-constraints" class="toc-h2">3. Assumptions & Constraints</a>
+<a href="#4actors-roles" class="toc-h2">4. Actors & Roles</a>
+<a href="#5architectural-decisions" class="toc-h2">5. Architectural Decisions</a>
+<a href="#6system-architecture" class="toc-h2">6. System Architecture</a>
+<a href="#7smart-contracts" class="toc-h2">7. Smart Contracts</a>
+<a href="#8applications" class="toc-h2">8. Applications</a>
+<a href="#9backend-services" class="toc-h2">9. Backend Services</a>
+<a href="#get-agent-with-trust-info" class="toc-h1">Get agent with trust info</a>
+<a href="#get-pending-claims-for-council" class="toc-h1">Get pending claims for council</a>
+<a href="#protocol-statistics" class="toc-h1">Protocol statistics</a>
+<a href="#10data-flows" class="toc-h2">10. Data Flows</a>
+<a href="#11economic-model" class="toc-h2">11. Economic Model</a>
+<a href="#12off-chain-components" class="toc-h2">12. Off-Chain Components</a>
+<a href="#13security-considerations" class="toc-h2">13. Security Considerations</a>
+<a href="#14deployment-architecture" class="toc-h2">14. Deployment Architecture</a>
+<a href="#start-all-services" class="toc-h1">Start all services</a>
+<a href="#view-status" class="toc-h1">View status</a>
+<a href="#view-logs" class="toc-h1">View logs</a>
+<a href="#example-for-api" class="toc-h1">Example for API</a>
+<a href="#15open-items-future-work" class="toc-h2">15. Open Items & Future Work</a>
+<a href="#appendix-a-event-reference" class="toc-h2">Appendix A: Event Reference</a>
+<a href="#appendix-b-governance-functions-summary" class="toc-h2">Appendix B: Governance Functions Summary</a>
+<a href="#appendix-c-api-endpoints-summary" class="toc-h2">Appendix C: API Endpoints Summary</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+      <div class="version-badge">
+        <span class="dot"></span>
+        Version 1.3 · January 2026
+      </div>
+      <h1 id="trustful-agents-architecture-specification">Trustful Agents Architecture Specification</h1>
+<h2 id="version-13">Version 1.3</h2>
+<h2 id="date-2026-01-30">Date: 2026-01-30</h2>
+<hr>
+<h2 id="document-history">Document History</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1.0</td>
+<td>2025-12-04</td>
+<td>Initial architecture with 7 contracts</td>
+</tr>
+<tr>
+<td>1.1</td>
+<td>2025-12-05</td>
+<td>Added claim deposits, payment binding, council binding, partial locking</td>
+</tr>
+<tr>
+<td>1.2</td>
+<td>2025-12-09</td>
+<td>Deposit distribution to voters, governance role, maxPayoutPerClaim off-chain, vote change</td>
+</tr>
+<tr>
+<td>1.3</td>
+<td>2026-01-30</td>
+<td>Full system implementation: dashboards, API, subgraph, deployment architecture, audit fixes</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-executive-summary">Executive Summary</a></li>
+<li><a href="#2-requirements">Requirements</a></li>
+<li><a href="#3-assumptions--constraints">Assumptions &amp; Constraints</a></li>
+<li><a href="#4-actors--roles">Actors &amp; Roles</a></li>
+<li><a href="#5-architectural-decisions">Architectural Decisions</a></li>
+<li><a href="#6-system-architecture">System Architecture</a></li>
+<li><a href="#7-smart-contracts">Smart Contracts</a></li>
+<li><a href="#8-applications">Applications</a></li>
+<li><a href="#9-backend-services">Backend Services</a></li>
+<li><a href="#10-data-flows">Data Flows</a></li>
+<li><a href="#11-economic-model">Economic Model</a></li>
+<li><a href="#12-off-chain-components">Off-Chain Components</a></li>
+<li><a href="#13-security-considerations">Security Considerations</a></li>
+<li><a href="#14-deployment-architecture">Deployment Architecture</a></li>
+<li><a href="#15-open-items--future-work">Open Items &amp; Future Work</a></li>
+</ol>
+<hr>
+<h2 id="1executive-summary">1. Executive Summary</h2>
+<p>Trustful Agents is a decentralized trust layer for AI agents registered via ERC-8004. It enables agent providers to demonstrate accountability by depositing collateral and committing to terms &amp; conditions. Clients who suffer damages from agent misbehavior can file claims that are adjudicated by on-chain governance councils.</p>
+<h3>Key Capabilities</h3>
+<ul>
+<li><strong>Collateral deposits</strong> in USDC as trust signal</li>
+<li><strong>On-chain T&amp;C commitment</strong> with content hash verification</li>
+<li><strong>Claim deposits</strong> for economic spam prevention</li>
+<li><strong>Payment binding</strong> via x402 receipt hashes (hybrid: supports non-x402 payments via evidence)</li>
+<li><strong>Council-based dispute resolution</strong> with unbiased incentives</li>
+<li><strong>Automatic ERC-8004 validation</strong> with explicit conditions</li>
+<li><strong>Integration with A2A Protocol</strong> for agent discovery via Agent Cards</li>
+<li><strong>Governance via Safe multisig</strong> for council management</li>
+</ul>
+<h3>v1.3 Highlights</h3>
+<ul>
+<li><strong>Full Dashboard Suite:</strong> Provider, Claimer, Council, and Governance dashboards</li>
+<li><strong>Governance API:</strong> Centralized backend for metadata, evidence storage, and Safe SDK integration</li>
+<li><strong>Subgraph Indexer:</strong> Real-time blockchain data indexing via The Graph</li>
+<li><strong>Audit Fixes:</strong> Removed on-chain evidence, underflow protection, MAX_CLAIM_AMOUNT, council member limits</li>
+<li><strong>A2A Agent Cards:</strong> Provider dashboard generates discovery cards for validated agents</li>
+</ul>
+<h3>System Overview</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           TRUSTFUL AGENTS v1.3                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  DASHBOARDS                          API &amp; INDEXING                             │
+│  ┌─────────────────┐                 ┌─────────────────┐                        │
+│  │ Provider        │────────────────▶│ Governance API  │◀──────────────┐        │
+│  │ Dashboard       │                 │ (PostgreSQL)    │               │        │
+│  └─────────────────┘                 └────────┬────────┘               │        │
+│  ┌─────────────────┐                          │                        │        │
+│  │ Claimer         │──────────────────────────┤                        │        │
+│  │ Dashboard       │                          │                        │        │
+│  └─────────────────┘                 ┌────────▼────────┐               │        │
+│  ┌─────────────────┐                 │ Subgraph        │               │        │
+│  │ Council         │──────────────────(The Graph)      │               │        │
+│  │ Dashboard       │                 └────────┬────────┘               │        │
+│  └─────────────────┘                          │                        │        │
+│  ┌─────────────────┐                          │                        │        │
+│  │ Governance      │──────────────────────────┘                        │        │
+│  │ Dashboard       │                                                   │        │
+│  └────────┬────────┘                                                   │        │
+│           │                                                            │        │
+│           ▼                                                            │        │
+│  ┌─────────────────────────────────────────────────────────────────────┘        │
+│  │                          BLOCKCHAIN (Base)                                   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  │ Collateral   │  │    Terms     │  │   Council    │  │   Claims     │      │
+│  │  │   Vault      │  │   Registry   │  │   Registry   │  │   Manager    │      │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  │   Ruling     │  │  Trustful    │  │  ERC-8004    │  │    USDC      │      │
+│  │  │  Executor    │  │  Validator   │  │  Registry    │  │              │      │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  └──────────────────────────────────────────────────────────────────────────────┘
+│                                                                                 │
+│  EXTERNAL STORAGE                                                               │
+│  ┌──────────────────┐                                                           │
+│  │ IPFS / Filecoin  │◀─── T&amp;C Documents (contentUri in TermsRegistry)           │
+│  └──────────────────┘                                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2 id="2requirements">2. Requirements</h2>
+<h3>2.1 Functional Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Priority</th>
+<th>Version</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-01</td>
+<td>Providers can deposit USDC collateral per agent</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-02</td>
+<td>Providers can register and update T&amp;C with content hash</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-03</td>
+<td>Providers can withdraw collateral with grace period</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-04</td>
+<td>Clients can verify agent validation status</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-05</td>
+<td>Claimants can file claims with evidence and deposit</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-06</td>
+<td>Council members can vote on claims (approve/reject/abstain)</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-07</td>
+<td>Approved claims trigger compensation from collateral</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-08</td>
+<td>System issues/revokes ERC-8004 validations automatically</td>
+<td>Must</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>FR-09</td>
+<td>Claimants must provide deposit (% of claimed amount)</td>
+<td>Must</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>FR-10</td>
+<td>Claims must reference payment proof for eligibility</td>
+<td>Should</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>FR-11</td>
+<td>Council determined by agent&#39;s terms, not claimant choice</td>
+<td>Must</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>FR-12</td>
+<td>Partial collateral locking when insufficient funds</td>
+<td>Should</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>FR-13</td>
+<td>Claimant deposits distributed to voting council members (all outcomes)</td>
+<td>Must</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>FR-14</td>
+<td>Governance can create/close councils</td>
+<td>Must</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>FR-15</td>
+<td>Governance can reassign agents to different councils</td>
+<td>Must</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>FR-16</td>
+<td>Council members can change votes during voting period</td>
+<td>Should</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>FR-17</td>
+<td>Expired claims with no votes return deposit to claimant</td>
+<td>Must</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>FR-18</td>
+<td>Provider dashboard generates A2A Agent Cards</td>
+<td>Should</td>
+<td>1.3</td>
+</tr>
+<tr>
+<td>FR-19</td>
+<td>Evidence stored off-chain in centralized database</td>
+<td>Must</td>
+<td>1.3</td>
+</tr>
+<tr>
+<td>FR-20</td>
+<td>Council member count limited to 11 per council</td>
+<td>Must</td>
+<td>1.3</td>
+</tr>
+</tbody></table>
+<h3>2.2 Non-Functional Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-01</td>
+<td>Gas-efficient operations for high-frequency interactions</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>NFR-02</td>
+<td>Upgradeable contracts via proxy pattern</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>NFR-03</td>
+<td>Event emissions for off-chain indexing</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>NFR-04</td>
+<td>Pausable in emergency situations</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>NFR-05</td>
+<td>Compatible with Base blockchain</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>NFR-06</td>
+<td>Real-time data availability via subgraph</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>NFR-07</td>
+<td>SIWE authentication for governance operations</td>
+<td>Must</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="3assumptions-amp-constraints">3. Assumptions &amp; Constraints</h2>
+<h3>3.1 Assumptions</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Assumption</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A-01</td>
+<td>ERC-8004 Identity Registry is deployed and operational</td>
+</tr>
+<tr>
+<td>A-02</td>
+<td>USDC is the collateral and payment asset</td>
+</tr>
+<tr>
+<td>A-03</td>
+<td>x402 protocol is available for payment metadata (but not required)</td>
+</tr>
+<tr>
+<td>A-04</td>
+<td>IPFS/Filecoin available for T&amp;C document storage</td>
+</tr>
+<tr>
+<td>A-05</td>
+<td>Council members are trusted parties appointed by governance</td>
+</tr>
+<tr>
+<td>A-06</td>
+<td>Providers own their agents via ERC-8004 (ERC-721 ownership)</td>
+</tr>
+<tr>
+<td>A-07</td>
+<td>Governance operates via Safe multisig</td>
+</tr>
+</tbody></table>
+<h3>3.2 Constraints</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Constraint</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C-01</td>
+<td>Single chain deployment (Base) initially</td>
+</tr>
+<tr>
+<td>C-02</td>
+<td>No cross-chain collateral or claims</td>
+</tr>
+<tr>
+<td>C-03</td>
+<td>One council per agent (determined by terms or governance)</td>
+</tr>
+<tr>
+<td>C-04</td>
+<td>No appeal mechanism (final ruling)</td>
+</tr>
+<tr>
+<td>C-05</td>
+<td>No vote delegation</td>
+</tr>
+<tr>
+<td>C-06</td>
+<td>Maximum 11 council members per council (gas safety)</td>
+</tr>
+<tr>
+<td>C-07</td>
+<td>Maximum claim amount: 1 billion USDC</td>
+</tr>
+<tr>
+<td>C-08</td>
+<td>Minimum claim amount: 1 USDC</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4actors-amp-roles">4. Actors &amp; Roles</h2>
+<h3>4.1 Provider</h3>
+<p>The owner of an ERC-8004 agent who establishes trust through collateral and terms.</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>Deposit/withdraw collateral</li>
+<li>Register/update T&amp;C</li>
+<li>View validation status</li>
+<li>View pending claims against their agents</li>
+<li>Submit counter-evidence</li>
+<li>Generate A2A Agent Cards</li>
+</ul>
+<p><strong>Primary Interface:</strong> Provider Dashboard</p>
+<h3>4.2 Client</h3>
+<p>A user or agent that discovers and uses trustworthy agents.</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>Verify agent validation status via ERC-8004</li>
+<li>View collateral amount</li>
+<li>Read T&amp;C before using agent</li>
+<li>Check withdrawal pending status (risk signal)</li>
+<li>Query trust info via API or subgraph</li>
+</ul>
+<p><strong>Primary Interface:</strong> Direct blockchain queries, A2A Agent Cards</p>
+<h3>4.3 Claimant</h3>
+<p>A client who has suffered damages and seeks compensation.</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>File claims with evidence, reasoning, and deposit</li>
+<li>Submit additional evidence</li>
+<li>Provide reasoning/justification for claim</li>
+<li>Respond to discussion with provider</li>
+<li>Track claim status</li>
+<li>Cancel claims (deposit forfeited to voters)</li>
+<li>Receive compensation if approved</li>
+<li>Execute finalized rulings</li>
+</ul>
+<p><strong>Primary Interface:</strong> Claimer Dashboard</p>
+<h3>4.4 Council Member</h3>
+<p>A trusted party appointed to evaluate claims within a specific vertical.</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>View claims assigned to their council</li>
+<li>Review evidence and counter-evidence</li>
+<li>Review claimant reasoning and discussion</li>
+<li>Cast votes (Approve / Reject / Abstain)</li>
+<li>Change votes during voting period</li>
+<li>Receive portion of claimant deposits for voting</li>
+</ul>
+<p><strong>Primary Interface:</strong> Council Dashboard</p>
+<h3>4.5 Governance (Multisig)</h3>
+<p>Centralized administrative role operated via Safe multisig.</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>Create new councils</li>
+<li>Close councils (if no agents/claims linked)</li>
+<li>Add/remove council members</li>
+<li>Reassign agents to different councils</li>
+<li>Pause system in emergencies</li>
+</ul>
+<p><strong>Primary Interface:</strong> Governance Dashboard</p>
+<hr>
+<h2 id="5architectural-decisions">5. Architectural Decisions</h2>
+<h3>AD-01: Collateral Per Agent (Not Per Provider)</h3>
+<p><strong>Decision:</strong> Each agent has its own collateral account.</p>
+<p><strong>Rationale:</strong> Isolates risk between agents. One agent&#39;s claims don&#39;t drain collateral for other agents.</p>
+<h3>AD-02: Council Binding via Terms</h3>
+<p><strong>Decision:</strong> Council is bound to agent via T&amp;C registration. Governance can override.</p>
+<p><strong>Rationale:</strong> Provider selects appropriate vertical; governance can correct misassignment.</p>
+<h3>AD-03: One Member One Vote</h3>
+<p><strong>Decision:</strong> Each council member gets one vote, regardless of stake.</p>
+<p><strong>Rationale:</strong> Simplicity for MVP. Stake-weighted voting deferred to future version.</p>
+<h3>AD-04: Grace Period for Withdrawals</h3>
+<p><strong>Decision:</strong> Collateral withdrawals require 7-day grace period.</p>
+<p><strong>Rationale:</strong> Prevents front-running (withdrawing before claim is filed).</p>
+<h3>AD-05: Claim Deposits Required</h3>
+<p><strong>Decision:</strong> Claimants must deposit percentage of claimed amount.</p>
+<p><strong>Rationale:</strong> Prevents spam claims; creates economic cost for frivolous claims.</p>
+<h3>AD-06: Deposit Distribution to Voters Only</h3>
+<p><strong>Decision:</strong> Claimant deposits are ALWAYS distributed to voting council members, regardless of claim outcome.</p>
+<p><strong>Rationale:</strong> Eliminates bias. If deposits were returned on approval, councils would be incentivized to approve. By distributing to voters regardless of outcome, councils have no financial preference for approve/reject.</p>
+<p><strong>Exception:</strong> If voting period expires with zero votes, deposit returns to claimant (protects against inactive councils).</p>
+<h3>AD-07: maxPayoutPerClaim Off-Chain</h3>
+<p><strong>Decision:</strong> The maximum payout per claim is stored in the T&amp;C document (off-chain), not in contract storage.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Avoids sync issues when T&amp;C is updated</li>
+<li>T&amp;C document is the source of truth</li>
+<li>Council verifies from document at claim time</li>
+<li>Reduces on-chain storage costs</li>
+</ul>
+<h3>AD-08: Governance via Multisig</h3>
+<p><strong>Decision:</strong> All governance actions require multisig confirmation (2-of-3).</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>No single point of failure</li>
+<li>Transparent decision-making</li>
+<li>Can upgrade to DAO in future</li>
+</ul>
+<h3>AD-09: Vote Changes Overwrite</h3>
+<p><strong>Decision:</strong> When a council member changes their vote, only the final vote counts.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Simplicity in median calculation</li>
+<li>Reduces storage (no vote history per claim)</li>
+<li>Members can correct mistakes</li>
+</ul>
+<h3>AD-10: Permissionless Claim Finalization</h3>
+<p><strong>Decision:</strong> Anyone can call <code>finalizeClaim()</code> after voting deadline.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>No dependency on specific party to trigger resolution</li>
+<li>Enables automation via keepers/bots</li>
+<li>Protects claimants from stalled claims</li>
+</ul>
+<h3>AD-11: Evidence Stored Off-Chain [v1.3]</h3>
+<p><strong>Decision:</strong> Evidence is stored in centralized PostgreSQL database, not on-chain.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Reduces gas costs significantly</li>
+<li>Evidence can be large (documents, logs)</li>
+<li>Hash verification still provides integrity</li>
+<li>Council can access evidence via API</li>
+</ul>
+<p><strong>Note:</strong> T&amp;C documents remain on IPFS for decentralization and permanence. Evidence uses PostgreSQL because it&#39;s claim-specific, time-sensitive, and benefits from structured queries.</p>
+<h3>AD-12: Council Member Limit [v1.3]</h3>
+<p><strong>Decision:</strong> Maximum 11 members per council.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Gas-safe iteration in deposit distribution</li>
+<li>Prevents unbounded loops</li>
+<li>Sufficient for diverse council composition</li>
+</ul>
+<h3>AD-13: Terminology: Reimbursement Not Slashing</h3>
+<p><strong>Decision:</strong> System describes compensation as &quot;reimbursement for damages&quot; not &quot;slashing&quot;.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Accurate to the mechanism (provider compensates claimant)</li>
+<li>Less adversarial framing</li>
+<li>Clearer user communication</li>
+</ul>
+<hr>
+<h2 id="6system-architecture">6. System Architecture</h2>
+<h3>6.1 Component Overview</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              SYSTEM COMPONENTS                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  FRONTEND APPLICATIONS                                                          │
+│  ├── Provider Dashboard      Agent registration, collateral, T&amp;C, Agent Cards  │
+│  ├── Claimer Dashboard       File claims, track status, evidence submission    │
+│  ├── Council Dashboard       Review claims, vote, voting history               │
+│  └── Governance Dashboard    Council management, Safe multisig integration     │
+│                                                                                 │
+│  BACKEND SERVICES                                                               │
+│  ├── Governance API          REST API, SIWE auth, evidence storage, Safe SDK   │
+│  └── Subgraph                Blockchain indexing via The Graph                 │
+│                                                                                 │
+│  SMART CONTRACTS (Base)                                                         │
+│  ├── CollateralVault         Holds USDC per agent                              │
+│  ├── TermsRegistry           Stores T&amp;C versions per agent                     │
+│  ├── CouncilRegistry         Manages councils and members                      │
+│  ├── ClaimsManager           Claim lifecycle and voting                        │
+│  ├── RulingExecutor          Executes compensations, distributes deposits      │
+│  └── TrustfulValidator       Issues/revokes ERC-8004 validations               │
+│                                                                                 │
+│  SUPPORTING CONTRACTS                                                           │
+│  ├── TrustfulPausable        Emergency pause base contract                     │
+│  └── GovernanceMultisig      2-of-3 multisig for governance                    │
+│                                                                                 │
+│  EXTERNAL DEPENDENCIES                                                          │
+│  ├── ERC-8004 Registry       Agent identity and validation                     │
+│  ├── USDC                    Collateral and payment asset                      │
+│  ├── Safe Multisig           Governance transaction management                 │
+│  ├── PostgreSQL              Evidence, metadata, sessions                      │
+│  ├── IPFS/Filecoin           T&amp;C document storage                              │
+│  └── The Graph               Subgraph hosting                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>6.2 Contract Relationships</h3>
+<pre><code>┌──────────────┐     owns      ┌──────────────┐
+│   Provider   │──────────────▶│  ERC-8004    │
+└──────────────┘               │   Agent      │
+       │                       └──────────────┘
+       │ deposits                     │
+       ▼                              │ agentId
+┌──────────────┐               ┌──────────────┐
+│  Collateral  │◀──────────────│    Terms     │
+│    Vault     │               │   Registry   │
+└──────────────┘               └──────────────┘
+       │                              │
+       │ locks/unlocks               │ councilId
+       ▼                              ▼
+┌──────────────┐               ┌──────────────┐
+│    Claims    │──────────────▶│   Council    │
+│   Manager    │   assigned    │   Registry   │
+└──────────────┘               └──────────────┘
+       │                              │
+       │ finalized                    │ members
+       ▼                              ▼
+┌──────────────┐               ┌──────────────┐
+│    Ruling    │──────────────▶│   Council    │
+│   Executor   │  distributes  │   Members    │
+└──────────────┘    deposits   └──────────────┘
+       │
+       │ validates
+       ▼
+┌──────────────┐
+│   Trustful   │──────────────▶ ERC-8004 Registry
+│  Validator   │    issues
+└──────────────┘
+</code></pre>
+<h3>6.3 Data Flow Architecture</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              DATA FLOW                                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  USER INTERACTIONS                                                              │
+│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐                      │
+│  │  Dashboard  │─────▶│  wagmi/viem │─────▶│  Blockchain │                      │
+│  │   (React)   │      │  (Web3)     │      │   (Base)    │                      │
+│  └─────────────┘      └─────────────┘      └──────┬──────┘                      │
+│         │                                         │                             │
+│         │ REST API                                │ Events                      │
+│         ▼                                         ▼                             │
+│  ┌─────────────┐                          ┌─────────────┐                       │
+│  │ Governance  │                          │  Subgraph   │                       │
+│  │    API      │                          │ (The Graph) │                       │
+│  └──────┬──────┘                          └──────┬──────┘                       │
+│         │                                         │                             │
+│         │ SQL                                     │ GraphQL                     │
+│         ▼                                         ▼                             │
+│  ┌─────────────┐                          ┌─────────────┐                       │
+│  │ PostgreSQL  │                          │  Indexed    │                       │
+│  │  Database   │                          │    Data     │                       │
+│  └─────────────┘                          └─────────────┘                       │
+│                                                                                 │
+│  DECENTRALIZED STORAGE                                                          │
+│  ┌─────────────┐                                                                │
+│  │    IPFS     │◀──── T&amp;C Documents (uploaded by Provider Dashboard)            │
+│  │  Filecoin   │                                                                │
+│  └─────────────┘                                                                │
+│                                                                                 │
+│  STORED DATA                                                                    │
+│  ├── PostgreSQL: Evidence, sessions, council metadata, pending txs, audit log  │
+│  ├── Subgraph: Agents, claims, votes, councils, deposits, withdrawals, stats   │
+│  └── IPFS: T&amp;C documents (referenced by contentUri in TermsRegistry)           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2 id="7smart-contracts">7. Smart Contracts</h2>
+<h3>7.1 CollateralVault</h3>
+<p>Holds USDC collateral per agent. Anyone can deposit, only owner can withdraw.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Per-agent collateral accounts</li>
+<li>7-day withdrawal grace period</li>
+<li>Claim-based locking mechanism</li>
+<li>Third-party deposits supported (but discouraged)</li>
+</ul>
+<p><strong>Data Structures:</strong></p>
+<pre><code class="language-solidity">struct CollateralAccount {
+    uint256 totalDeposited;
+    uint256 lockedAmount;
+    uint256 withdrawalInitiatedAt;    // 0 = no pending withdrawal
+    uint256 pendingWithdrawalAmount;
+    uint256 pendingClaimCount;
+}
+</code></pre>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>deposit(agentId, amount)</code></td>
+<td>Anyone</td>
+<td>Deposit USDC for agent</td>
+</tr>
+<tr>
+<td><code>initiateWithdrawal(agentId, amount)</code></td>
+<td>Owner</td>
+<td>Start withdrawal with grace period</td>
+</tr>
+<tr>
+<td><code>cancelWithdrawal(agentId)</code></td>
+<td>Owner</td>
+<td>Cancel pending withdrawal</td>
+</tr>
+<tr>
+<td><code>executeWithdrawal(agentId)</code></td>
+<td>Owner</td>
+<td>Complete withdrawal after grace period</td>
+</tr>
+<tr>
+<td><code>lock(agentId, claimId, amount)</code></td>
+<td>ClaimsManager</td>
+<td>Lock collateral for claim</td>
+</tr>
+<tr>
+<td><code>unlock(agentId, claimId, amount)</code></td>
+<td>RulingExecutor</td>
+<td>Unlock after rejection/expiry</td>
+</tr>
+<tr>
+<td><code>compensate(agentId, claimId, recipient, amount)</code></td>
+<td>RulingExecutor</td>
+<td>Transfer compensation</td>
+</tr>
+<tr>
+<td><code>getAccount(agentId)</code></td>
+<td>View</td>
+<td>Get account details</td>
+</tr>
+<tr>
+<td><code>getAvailableBalance(agentId)</code></td>
+<td>View</td>
+<td>Get unlocked balance</td>
+</tr>
+</tbody></table>
+<h3>7.2 TermsRegistry</h3>
+<p>Stores T&amp;C versions per agent. Only owner can register. Old T&amp;C remains valid for prior uses.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Version history per agent</li>
+<li>Content hash verification</li>
+<li>Council binding</li>
+<li>Timestamp-based lookups</li>
+</ul>
+<p><strong>Data Structures:</strong></p>
+<pre><code class="language-solidity">struct TermsVersion {
+    uint256 version;
+    bytes32 contentHash;
+    string contentUri;
+    uint256 effectiveFrom;
+    uint256 effectiveUntil;     // 0 = current
+    bytes32 councilId;          // Assigned council
+}
+</code></pre>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>registerTerms(agentId, hash, uri, councilId)</code></td>
+<td>Owner</td>
+<td>Register initial T&amp;C</td>
+</tr>
+<tr>
+<td><code>updateTerms(agentId, hash, uri)</code></td>
+<td>Owner</td>
+<td>Update T&amp;C (council unchanged)</td>
+</tr>
+<tr>
+<td><code>invalidateTerms(agentId)</code></td>
+<td>Validator</td>
+<td>Invalidate on ownership change</td>
+</tr>
+<tr>
+<td><code>getActiveTerms(agentId)</code></td>
+<td>View</td>
+<td>Get current T&amp;C</td>
+</tr>
+<tr>
+<td><code>getTermsAtTime(agentId, timestamp)</code></td>
+<td>View</td>
+<td>Get T&amp;C at specific time</td>
+</tr>
+<tr>
+<td><code>getTermsHistory(agentId)</code></td>
+<td>View</td>
+<td>Get all T&amp;C versions</td>
+</tr>
+</tbody></table>
+<h3>7.3 CouncilRegistry</h3>
+<p>Manages councils and members. Governance controls creation/closure.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Council lifecycle management</li>
+<li>Member management (max 11)</li>
+<li>Configurable voting/evidence periods</li>
+<li>Claim deposit percentage per council</li>
+</ul>
+<p><strong>Data Structures:</strong></p>
+<pre><code class="language-solidity">struct Council {
+    bytes32 councilId;
+    string name;
+    string description;
+    string vertical;
+    bool active;
+    uint256 createdAt;
+    uint256 closedAt;
+    address[] members;            // Max 11
+    uint256 votingPeriod;
+    uint256 evidencePeriod;
+    uint256 claimDepositPercentage;  // Basis points
+    uint256 quorumPercentage;        // Basis points
+}
+</code></pre>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>createCouncil(...)</code></td>
+<td>Governance</td>
+<td>Create new council</td>
+</tr>
+<tr>
+<td><code>closeCouncil(councilId)</code></td>
+<td>Governance</td>
+<td>Close council (pre-checks required)</td>
+</tr>
+<tr>
+<td><code>addMember(councilId, member)</code></td>
+<td>Governance</td>
+<td>Add council member</td>
+</tr>
+<tr>
+<td><code>removeMember(councilId, member)</code></td>
+<td>Governance</td>
+<td>Remove council member</td>
+</tr>
+<tr>
+<td><code>getCouncil(councilId)</code></td>
+<td>View</td>
+<td>Get council details</td>
+</tr>
+<tr>
+<td><code>getActiveCouncils()</code></td>
+<td>View</td>
+<td>List active councils</td>
+</tr>
+<tr>
+<td><code>isMember(councilId, member)</code></td>
+<td>View</td>
+<td>Check membership</td>
+</tr>
+<tr>
+<td><code>canCloseCouncil(councilId)</code></td>
+<td>View</td>
+<td>Check if closure is allowed</td>
+</tr>
+</tbody></table>
+<h3>7.4 ClaimsManager</h3>
+<p>Manages claim lifecycle and voting.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Full claim lifecycle (Filed → Executed)</li>
+<li>Evidence period followed by voting period</li>
+<li>Vote changing during voting period</li>
+<li>Median calculation for approved amounts</li>
+<li>Permissionless finalization</li>
+</ul>
+<p><strong>Data Structures:</strong></p>
+<pre><code class="language-solidity">struct Claim {
+    uint256 claimId;
+    uint256 agentId;
+    address claimant;
+    bytes32 paymentReceiptHash;
+    bytes32 evidenceHash;
+    string evidenceUri;
+    uint256 claimedAmount;
+    uint256 lockedAmount;
+    uint256 approvedAmount;
+    uint256 claimantDeposit;
+    bytes32 councilId;
+    address providerAtClaimTime;
+    bytes32 termsHashAtClaimTime;
+    ClaimStatus status;
+    uint256 filedAt;
+    uint256 evidenceDeadline;
+    uint256 votingDeadline;
+    uint256 resolvedAt;
+}
+
+enum ClaimStatus {
+    Filed,
+    EvidenceComplete,
+    Voting,
+    Approved,
+    Rejected,
+    Executed,
+    Expired,
+    Cancelled
+}
+
+enum Vote { None, Approve, Reject, Abstain }
+</code></pre>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fileClaim(agentId, amount, evidenceHash, evidenceUri, receiptHash)</code></td>
+<td>Anyone</td>
+<td>File new claim with deposit</td>
+</tr>
+<tr>
+<td><code>submitAdditionalEvidence(claimId, hash, uri)</code></td>
+<td>Claimant</td>
+<td>Add evidence before voting</td>
+</tr>
+<tr>
+<td><code>submitCounterEvidence(claimId, hash, uri)</code></td>
+<td>Provider</td>
+<td>Submit counter-evidence</td>
+</tr>
+<tr>
+<td><code>startVoting(claimId)</code></td>
+<td>Anyone</td>
+<td>Start voting after evidence period</td>
+</tr>
+<tr>
+<td><code>castVote(claimId, vote, approvedAmount, reasonUri)</code></td>
+<td>Council Member</td>
+<td>Cast vote</td>
+</tr>
+<tr>
+<td><code>changeVote(claimId, vote, approvedAmount, reasonUri)</code></td>
+<td>Council Member</td>
+<td>Change existing vote</td>
+</tr>
+<tr>
+<td><code>finalizeClaim(claimId)</code></td>
+<td>Anyone</td>
+<td>Finalize after voting deadline</td>
+</tr>
+<tr>
+<td><code>cancelClaim(claimId)</code></td>
+<td>Claimant</td>
+<td>Cancel before voting (deposit forfeited)</td>
+</tr>
+<tr>
+<td><code>getClaim(claimId)</code></td>
+<td>View</td>
+<td>Get claim details</td>
+</tr>
+<tr>
+<td><code>getVotes(claimId)</code></td>
+<td>View</td>
+<td>Get all votes</td>
+</tr>
+<tr>
+<td><code>getVotersForClaim(claimId)</code></td>
+<td>View</td>
+<td>Get addresses of voters</td>
+</tr>
+<tr>
+<td><code>calculateRequiredDeposit(amount, councilId)</code></td>
+<td>View</td>
+<td>Calculate deposit needed</td>
+</tr>
+</tbody></table>
+<p><strong>Note on Voting:</strong> While the smart contract accepts an <code>approvedAmount</code> parameter for median calculation, the Council Dashboard UI simplifies voting to Approve/Reject/Abstain without manual amount entry. For approved claims, the payout is determined by the lesser of: claimed amount, locked collateral, and maxPayoutPerClaim from T&amp;C.</p>
+<h3>7.5 RulingExecutor</h3>
+<p>Executes approved rulings and distributes deposits.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Compensation from locked collateral</li>
+<li>Deposit distribution to voters</li>
+<li>Special handling for expired claims</li>
+<li>Council fee deduction</li>
+</ul>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>executeApprovedClaim(claimId)</code></td>
+<td>Anyone</td>
+<td>Execute compensation + distribute deposit</td>
+</tr>
+<tr>
+<td><code>executeRejectedClaim(claimId)</code></td>
+<td>Anyone</td>
+<td>Distribute deposit to voters</td>
+</tr>
+<tr>
+<td><code>executeExpiredClaim(claimId)</code></td>
+<td>Anyone</td>
+<td>Handle expired claim</td>
+</tr>
+<tr>
+<td><code>executeClaim(claimId)</code></td>
+<td>Anyone</td>
+<td>Auto-routing based on status</td>
+</tr>
+<tr>
+<td><code>previewDepositDistribution(claimId)</code></td>
+<td>View</td>
+<td>Preview payout calculation</td>
+</tr>
+</tbody></table>
+<p><strong>Deposit Distribution Logic:</strong></p>
+<pre><code class="language-solidity">function _distributeDepositToVoters(uint256 claimId) internal {
+    Claim memory claim = claimsManager.getClaim(claimId);
+    address[] memory voters = claimsManager.getVotersForClaim(claimId);
+    
+    if (voters.length == 0) {
+        // No votes cast - return to claimant
+        USDC.transfer(claim.claimant, claim.claimantDeposit);
+    } else {
+        // Distribute equally to voters
+        uint256 perVoter = claim.claimantDeposit / voters.length;
+        for (uint i = 0; i &lt; voters.length; i++) {
+            USDC.transfer(voters[i], perVoter);
+        }
+    }
+}
+</code></pre>
+<h3>7.6 TrustfulValidator</h3>
+<p>Issues/revokes ERC-8004 validations reactively when conditions change.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Automatic validation based on conditions</li>
+<li>Explicit revocation reasons</li>
+<li>Trust info aggregation for clients</li>
+<li>Integration with ERC-8004 registry</li>
+</ul>
+<p><strong>Data Structures:</strong></p>
+<pre><code class="language-solidity">struct ValidationConditions {
+    bool hasCollateral;
+    bool hasActiveTerms;
+    bool ownershipValid;
+    bool councilIsActive;
+    bool allConditionsMet;
+}
+
+struct TrustInfo {
+    bool isValidated;
+    uint256 collateralBalance;
+    uint256 availableCollateral;
+    bool withdrawalPending;
+    bytes32 termsHash;
+    string termsUri;
+    bytes32 councilId;
+}
+
+enum RevocationReason {
+    None,
+    CollateralDepleted,
+    TermsInvalidated,
+    OwnershipChanged,
+    CouncilInactive,
+    ManualRevocation
+}
+</code></pre>
+<p><strong>Key Functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>checkAndUpdateValidation(agentId)</code></td>
+<td>Anyone</td>
+<td>Evaluate and update validation</td>
+</tr>
+<tr>
+<td><code>evaluateConditions(agentId)</code></td>
+<td>View</td>
+<td>Check all validation conditions</td>
+</tr>
+<tr>
+<td><code>isValidated(agentId)</code></td>
+<td>View</td>
+<td>Simple validation check</td>
+</tr>
+<tr>
+<td><code>getValidationStatus(agentId)</code></td>
+<td>View</td>
+<td>Detailed status with reason</td>
+</tr>
+<tr>
+<td><code>getTrustInfo(agentId)</code></td>
+<td>View</td>
+<td>Get full trust information</td>
+</tr>
+</tbody></table>
+<h3>7.7 Supporting Contracts</h3>
+<p><strong>TrustfulPausable:</strong></p>
+<ul>
+<li>Emergency pause mechanism</li>
+<li>Controlled by governance multisig</li>
+<li>Inherited by all core contracts</li>
+</ul>
+<p><strong>GovernanceMultisig:</strong></p>
+<ul>
+<li>2-of-3 multisig configuration</li>
+<li>Integrated with Safe for transaction management</li>
+<li>Controls all governance functions</li>
+</ul>
+<hr>
+<h2 id="8applications">8. Applications</h2>
+<h3>8.1 Provider Dashboard</h3>
+<p><strong>Purpose:</strong> Agent registration, collateral management, T&amp;C, validation, and A2A Agent Card generation.</p>
+<p><strong>Tech Stack:</strong></p>
+<ul>
+<li>React 18 + TypeScript</li>
+<li>Vite build tool</li>
+<li>wagmi v2 / viem for Web3</li>
+<li>TailwindCSS</li>
+<li>TanStack Query</li>
+</ul>
+<p><strong>Key Features:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Agent Registration</td>
+<td>Mint ERC-8004 agent NFT</td>
+</tr>
+<tr>
+<td>Agent Metadata</td>
+<td>Add name and description for the agent</td>
+</tr>
+<tr>
+<td>Collateral Management</td>
+<td>Deposit, withdraw, view balance</td>
+</tr>
+<tr>
+<td>T&amp;C Registration</td>
+<td>Upload to IPFS (versioned with timestamp), register hash on-chain</td>
+</tr>
+<tr>
+<td>Council Selection</td>
+<td>Select council by vertical</td>
+</tr>
+<tr>
+<td>Validation Status</td>
+<td>View conditions and validation state</td>
+</tr>
+<tr>
+<td>Claims View</td>
+<td>See claims against owned agents</td>
+</tr>
+<tr>
+<td>Counter-Evidence</td>
+<td>Submit evidence against claims</td>
+</tr>
+<tr>
+<td>Agent Cards</td>
+<td>Generate A2A Protocol discovery cards</td>
+</tr>
+</tbody></table>
+<p><strong>User Flow:</strong></p>
+<pre><code>1. Connect Wallet → 2. Mint/Select Agent → 3. Add Name &amp; Description
+                                                    ↓
+4. Deposit Collateral → 5. Upload T&amp;C to IPFS → 6. Select Council
+                                                    ↓
+7. Check Conditions → 8. Trigger Validation → 9. Agent Validated!
+                                                    ↓
+                              10. Generate Agent Card for A2A Discovery
+</code></pre>
+<p><strong>Ongoing Operations:</strong></p>
+<ul>
+<li>Top up or withdraw collateral (7-day grace period)</li>
+<li>Upload new T&amp;C versions (timestamped, stored on IPFS)</li>
+<li>View and respond to claims</li>
+</ul>
+<p><strong>API Integration:</strong></p>
+<ul>
+<li><code>/provider/agents</code> - Agent management</li>
+<li><code>/v1/validation</code> - Validation endpoints</li>
+<li>Direct blockchain calls via wagmi</li>
+</ul>
+<h3>8.2 Claimer Dashboard</h3>
+<p><strong>Purpose:</strong> File and track claims against AI agents.</p>
+<p><strong>Tech Stack:</strong></p>
+<ul>
+<li>React 18 + TypeScript</li>
+<li>Vite + TailwindCSS</li>
+<li>wagmi/viem</li>
+<li>React Router</li>
+</ul>
+<p><strong>Key Features:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dashboard</td>
+<td>Overview with claim statistics</td>
+</tr>
+<tr>
+<td>File Claim</td>
+<td>Step-by-step wizard with deposit calculation</td>
+</tr>
+<tr>
+<td>Provide Reasoning</td>
+<td>Explain and justify the claim</td>
+</tr>
+<tr>
+<td>My Claims</td>
+<td>View and filter all claims</td>
+</tr>
+<tr>
+<td>Agent Lookup</td>
+<td>Search agents and view trust status</td>
+</tr>
+<tr>
+<td>Claim Detail</td>
+<td>Track progress, evidence, voting status</td>
+</tr>
+<tr>
+<td>Discussion</td>
+<td>Respond to provider and council comments</td>
+</tr>
+<tr>
+<td>Execute Ruling</td>
+<td>Finalize and execute approved claims</td>
+</tr>
+</tbody></table>
+<p><strong>Claim Filing Flow:</strong></p>
+<pre><code>1. Search Agent → 2. Verify Trust Status → 3. Enter Claim Amount
+                                                    ↓
+4. Calculate Deposit → 5. Provide Reasoning → 6. Upload Evidence
+                                                    ↓
+7. File Claim (pay deposit) → 8. Monitor Status → 9. Add Evidence/Discuss
+                                                    ↓
+              10. Execute Ruling (if approved) → 11. Receive Compensation
+</code></pre>
+<p><strong>During Evidence Period:</strong></p>
+<ul>
+<li>Upload additional evidence</li>
+<li>View provider&#39;s counter-evidence  </li>
+<li>Respond to discussion</li>
+<li>Option to cancel (deposit forfeited to voters)</li>
+</ul>
+<p><strong>API Integration:</strong></p>
+<ul>
+<li><code>/claims</code> - Claim management</li>
+<li><code>/claims/:id/evidence</code> - Evidence submission</li>
+<li>Subgraph queries for historical data</li>
+</ul>
+<h3>8.3 Council Dashboard</h3>
+<p><strong>Purpose:</strong> Council members review claims and vote on disputes.</p>
+<p><strong>Tech Stack:</strong></p>
+<ul>
+<li>React 18 + TypeScript</li>
+<li>Vite + TailwindCSS</li>
+<li>wagmi/viem</li>
+<li>React Query</li>
+</ul>
+<p><strong>Key Features:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Claim Queue</td>
+<td>View pending claims for member&#39;s councils</td>
+</tr>
+<tr>
+<td>Claim Detail</td>
+<td>Review evidence, counter-evidence, and reasoning</td>
+</tr>
+<tr>
+<td>T&amp;C Review</td>
+<td>Fetch and verify T&amp;C from IPFS</td>
+</tr>
+<tr>
+<td>Voting</td>
+<td>Cast votes (Approve/Reject/Abstain)</td>
+</tr>
+<tr>
+<td>Vote Changing</td>
+<td>Update vote during voting period</td>
+</tr>
+<tr>
+<td>Voting History</td>
+<td>Track past votes and outcomes</td>
+</tr>
+<tr>
+<td>Deposit Earnings</td>
+<td>View share of deposits received</td>
+</tr>
+</tbody></table>
+<p><strong>Voting Flow:</strong></p>
+<pre><code>1. Connect Wallet → 2. View Assigned Claims → 3. Review Evidence &amp; T&amp;C
+                                                      ↓
+4. Review Reasoning &amp; Discussion → 5. Cast Vote → 6. Optionally Change Vote
+                                                      ↓
+                                    7. Voting Closes → 8. Receive Deposit Share
+</code></pre>
+<p><strong>API Integration:</strong></p>
+<ul>
+<li><code>/claims</code> - Claim listing and details</li>
+<li><code>/claims/:id/votes</code> - Vote management</li>
+<li><code>/claims/members/:address/councils</code> - Member&#39;s councils</li>
+<li>Subgraph for voting history</li>
+</ul>
+<h3>8.4 Governance Dashboard</h3>
+<p><strong>Purpose:</strong> Council management via Safe multisig for governance signers.</p>
+<p><strong>Tech Stack:</strong></p>
+<ul>
+<li>React 18 + TypeScript</li>
+<li>Vite + TailwindCSS</li>
+<li>Safe SDK integration</li>
+<li>SIWE authentication</li>
+</ul>
+<p><strong>Key Features:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Council Creation</td>
+<td>Create council with name, vertical, periods, quorum, deposit %</td>
+</tr>
+<tr>
+<td>Council View</td>
+<td>View all councils with member counts and statistics</td>
+</tr>
+<tr>
+<td>Council Close</td>
+<td>Close council (requires no agents/claims assigned)</td>
+</tr>
+<tr>
+<td>Add Member</td>
+<td>Add member to council (max 11 per council)</td>
+</tr>
+<tr>
+<td>Remove Member</td>
+<td>Remove member from council</td>
+</tr>
+<tr>
+<td>Reassign Agent</td>
+<td>Assign agent to different council</td>
+</tr>
+<tr>
+<td>Pending Transactions</td>
+<td>View and vote on pending Safe transactions</td>
+</tr>
+<tr>
+<td>Audit Log</td>
+<td>View history of all governance actions</td>
+</tr>
+<tr>
+<td>Safe Integration</td>
+<td>Direct transaction proposals via Safe SDK</td>
+</tr>
+</tbody></table>
+<p><strong>Council Creation Parameters:</strong></p>
+<ul>
+<li>Name and description</li>
+<li>Vertical (e.g., Finance, Healthcare, General)</li>
+<li>Evidence period (e.g., 7 days)</li>
+<li>Voting period (e.g., 7 days)</li>
+<li>Quorum percentage (e.g., 51%)</li>
+<li>Claimer deposit percentage (e.g., 5%)</li>
+</ul>
+<p><strong>Governance Flow:</strong></p>
+<pre><code>1. SIWE Login (Safe owner) → 2. Select Operation → 3. Fill Parameters
+                                                        ↓
+4. Propose to Safe → 5. Signer 1 Signs → 6. Notify Other Signers
+                                                        ↓
+7. Signer 2 Signs → 8. Threshold (2-of-3) Reached → 9. Execute On-Chain
+                                                        ↓
+                                         10. CouncilRegistry Updated
+</code></pre>
+<p><strong>API Integration:</strong></p>
+<ul>
+<li><code>/auth</code> - SIWE authentication</li>
+<li><code>/councils</code> - Council CRUD</li>
+<li><code>/safe</code> - Safe transaction management</li>
+<li><code>/pending</code> - Pending transaction tracking</li>
+</ul>
+<hr>
+<h2 id="9backend-services">9. Backend Services</h2>
+<h3>9.1 Governance API</h3>
+<p><strong>Purpose:</strong> Centralized backend for metadata, evidence storage, authentication, and Safe SDK integration.</p>
+<p><strong>Tech Stack:</strong></p>
+<ul>
+<li>Node.js + Express</li>
+<li>TypeScript</li>
+<li>PostgreSQL</li>
+<li>Safe SDK</li>
+<li>SIWE (Sign-In with Ethereum)</li>
+<li>AWS SES (email notifications)</li>
+</ul>
+<p><strong>API Route Groups:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/auth</code></td>
+<td>SIWE authentication (nonce, login, logout, profile)</td>
+</tr>
+<tr>
+<td><code>/councils</code></td>
+<td>Council CRUD and member management</td>
+</tr>
+<tr>
+<td><code>/claims</code></td>
+<td>Claim listing, details, evidence, votes</td>
+</tr>
+<tr>
+<td><code>/safe</code></td>
+<td>Safe multisig info and transaction management</td>
+</tr>
+<tr>
+<td><code>/pending</code></td>
+<td>Pending governance transaction tracking</td>
+</tr>
+<tr>
+<td><code>/agents</code></td>
+<td>Agent information and council assignment</td>
+</tr>
+<tr>
+<td><code>/v1/validation</code></td>
+<td>Validation status endpoints</td>
+</tr>
+<tr>
+<td><code>/provider/agents</code></td>
+<td>Provider-specific agent management</td>
+</tr>
+</tbody></table>
+<p><strong>Database Schema (PostgreSQL):</strong></p>
+<pre><code class="language-sql">-- Core tables
+governance_signers    -- Safe multisig owners
+council_members       -- Off-chain member metadata (name, email, expertise)
+sessions              -- SIWE authentication sessions
+
+-- Claims and evidence
+claims_metadata       -- Off-chain claim details
+evidence              -- Evidence files and hashes
+votes_metadata        -- Vote reasoning (off-chain)
+
+-- Governance
+pending_transactions  -- Pending Safe transactions with context
+audit_log             -- All governance actions
+
+-- Notifications
+email_queue           -- Pending email notifications
+</code></pre>
+<p><strong>Background Tasks:</strong></p>
+<ul>
+<li>Email queue processing (30-second interval)</li>
+<li>Session cleanup (5-minute interval)</li>
+</ul>
+<p><strong>Security Features:</strong></p>
+<ul>
+<li>SIWE verification against Safe owners</li>
+<li>Rate limiting (100 req/15min general, 20 req/15min auth)</li>
+<li>Input validation via Zod schemas</li>
+<li>CORS restriction to dashboard origins</li>
+<li>Helmet security headers</li>
+</ul>
+<h3>9.2 Subgraph (The Graph)</h3>
+<p><strong>Purpose:</strong> Real-time blockchain data indexing for efficient querying.</p>
+<p><strong>Indexed Contracts:</strong></p>
+<ul>
+<li>CollateralVault</li>
+<li>TermsRegistry</li>
+<li>TrustfulValidator</li>
+<li>CouncilRegistry</li>
+<li>ClaimsManager</li>
+<li>RulingExecutor</li>
+</ul>
+<p><strong>Entities:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Entity</th>
+<th>Key Fields</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Agent</code></td>
+<td>id, owner, collateral, terms, validation, claims stats</td>
+</tr>
+<tr>
+<td><code>TermsVersion</code></td>
+<td>agent, version, contentHash, councilId, isActive</td>
+</tr>
+<tr>
+<td><code>Council</code></td>
+<td>id, name, vertical, members, stats</td>
+</tr>
+<tr>
+<td><code>CouncilMember</code></td>
+<td>council, member, voting stats</td>
+</tr>
+<tr>
+<td><code>Claim</code></td>
+<td>agent, council, claimant, amounts, status, timeline</td>
+</tr>
+<tr>
+<td><code>Vote</code></td>
+<td>claim, voter, vote type, approvedAmount</td>
+</tr>
+<tr>
+<td><code>Evidence</code></td>
+<td>claim, submitter, hash, isCounterEvidence</td>
+</tr>
+<tr>
+<td><code>Deposit</code></td>
+<td>agent, depositor, amount, timestamp</td>
+</tr>
+<tr>
+<td><code>Withdrawal</code></td>
+<td>agent, amount, status, timestamps</td>
+</tr>
+<tr>
+<td><code>ValidationEvent</code></td>
+<td>agent, eventType, timestamp</td>
+</tr>
+<tr>
+<td><code>ProtocolStats</code></td>
+<td>global aggregates</td>
+</tr>
+</tbody></table>
+<p><strong>Sample Queries:</strong></p>
+<pre><code class="language-graphql"># Get agent with trust info
+query Agent($id: ID!) {
+  agent(id: $id) {
+    id
+    owner
+    collateralBalance
+    availableCollateral
+    isValidated
+    activeTermsHash
+    totalClaims
+    approvedClaims
+  }
+}
+
+# Get pending claims for council
+query PendingClaims($councilId: ID!) {
+  claims(where: { council: $councilId, status: Voting }) {
+    id
+    claimant
+    claimedAmount
+    votingDeadline
+    votes { voter { member } vote approvedAmount }
+  }
+}
+
+# Protocol statistics
+query Stats {
+  protocolStats(id: &quot;global&quot;) {
+    totalAgents
+    validatedAgents
+    totalCollateral
+    totalClaims
+    totalCompensationPaid
+  }
+}
+</code></pre>
+<hr>
+<h2 id="10data-flows">10. Data Flows</h2>
+<h3>10.1 Agent Onboarding</h3>
+<pre><code>1. Provider connects wallet to Provider Dashboard
+2. Provider mints new ERC-8004 agent OR selects existing agent → agentId
+3. Provider adds agent name and description (metadata)
+4. Provider approves USDC spend for collateral
+5. Provider calls deposit(agentId, amount) on CollateralVault
+6. CollateralVault accepts deposit, emits Deposited event
+7. Provider creates T&amp;C document following schema
+8. Provider uploads T&amp;C to IPFS → contentUri (e.g., ipfs://Qm...) with timestamp
+9. Provider computes contentHash of T&amp;C document
+10. Provider selects council by vertical
+11. Provider calls registerTerms(agentId, contentHash, contentUri, councilId)
+12. TermsRegistry stores T&amp;C reference, emits TermsRegistered event
+13. Dashboard checks validation conditions:
+    - hasCollateral: ✓
+    - hasActiveTerms: ✓
+    - ownershipValid: ✓
+    - councilIsActive: ✓
+14. If all conditions met, trigger checkAndUpdateValidation(agentId)
+15. TrustfulValidator issues validation via ERC-8004
+16. Subgraph indexes all events
+17. Agent is now discoverable as Trustful-validated
+18. Provider can generate A2A Agent Card (includes IPFS T&amp;C link)
+
+Ongoing operations:
+- Top up collateral anytime
+- Withdraw collateral (7-day grace period)
+- Upload new T&amp;C versions (timestamped, stored on IPFS)
+- Governance can reassign agent to different council
+</code></pre>
+<h3>10.2 Client Verification</h3>
+<pre><code>1. Client discovers agent via A2A Protocol or direct query
+2. Client queries ERC-8004: getAgentValidations(agentId)
+3. Client checks validator == TRUSTFUL_VALIDATOR
+4. Client calls getTrustInfo(agentId) for live data:
+   - Collateral amount
+   - T&amp;C hash and URI (IPFS link)
+   - Withdrawal pending status
+   - Council assignment
+5. Client fetches T&amp;C document from IPFS using contentUri
+6. Client verifies document hash matches on-chain contentHash
+7. Client reviews terms including maxPayoutPerClaim
+8. Client decides whether to use agent based on trust signals
+</code></pre>
+<h3>10.3 Claim Resolution</h3>
+<pre><code>1. Claimant prepares evidence and reasoning
+2. Claimant uploads evidence to API → stored in PostgreSQL
+3. Claimant provides reasoning/justification for the claim
+4. Claimant calls fileClaim() with deposit
+5. ClaimsManager:
+   - Snapshots provider, termsHash at claim time
+   - Locks collateral (up to available amount)
+   - Transfers deposit from claimant
+6. Evidence period: 
+   - Claimant can add more evidence
+   - Provider can submit counter-evidence
+   - Both parties can participate in discussion
+7. Anyone calls startVoting() after evidence deadline
+8. Council members review evidence, reasoning, and T&amp;C via Council Dashboard
+9. Council members cast votes (Approve/Reject/Abstain)
+   - Members can change vote during voting period
+10. Anyone calls finalizeClaim() after voting deadline
+11. ClaimsManager calculates result:
+    - If approved: payout = min(claimed, locked, maxPayoutPerClaim)
+    - If rejected: no compensation
+    - If expired (no votes): special handling
+12. Anyone calls executeClaim() on RulingExecutor
+13. RulingExecutor processes:
+    - If approved: transfer compensation, distribute deposit to voters
+    - If rejected: unlock collateral, distribute deposit to voters
+    - If expired (no votes): unlock collateral, return deposit to claimant
+</code></pre>
+<h3>10.4 Deposit Distribution Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Claimant Deposit</th>
+<th>Provider Collateral</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Approved</td>
+<td>→ Voting council members</td>
+<td>→ Claimant (compensation)</td>
+</tr>
+<tr>
+<td>Rejected</td>
+<td>→ Voting council members</td>
+<td>Unlocked (no transfer)</td>
+</tr>
+<tr>
+<td>Cancelled</td>
+<td>→ Voting council members</td>
+<td>Unlocked (no transfer)</td>
+</tr>
+<tr>
+<td>Expired (votes cast)</td>
+<td>→ Voting council members</td>
+<td>Unlocked (no transfer)</td>
+</tr>
+<tr>
+<td>Expired (no votes)</td>
+<td>→ Returned to claimant</td>
+<td>Unlocked (no transfer)</td>
+</tr>
+</tbody></table>
+<h3>10.5 Governance Transaction Flow</h3>
+<pre><code>1. Governance signer connects to Governance Dashboard
+2. SIWE authentication verifies Safe owner status
+3. Signer proposes action (e.g., create council)
+4. Dashboard prepares Safe transaction via Safe SDK
+5. Signer signs with MetaMask
+6. Transaction proposed to Safe Transaction Service
+7. API stores pending transaction metadata
+8. Other signers notified via email
+9. Other signers vote in Safe UI or Governance Dashboard
+10. When threshold reached, transaction executable
+11. Anyone executes on-chain
+12. CouncilRegistry updated, events emitted
+13. Subgraph indexes changes
+</code></pre>
+<hr>
+<h2 id="11economic-model">11. Economic Model</h2>
+<h3>11.1 Collateral Economics</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Asset</td>
+<td>USDC (stable, predictable)</td>
+</tr>
+<tr>
+<td>Minimum</td>
+<td>None enforced (market decides)</td>
+</tr>
+<tr>
+<td>Locking</td>
+<td>Partial locking if collateral &lt; claimed amount</td>
+</tr>
+<tr>
+<td>Grace Period</td>
+<td>7 days for withdrawals</td>
+</tr>
+</tbody></table>
+<h3>11.2 Claim Deposits</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Calculation</td>
+<td><code>claimDepositPercentage * claimedAmount / 10000</code></td>
+</tr>
+<tr>
+<td>Example</td>
+<td>5% deposit on 10,000 USDC claim = 500 USDC</td>
+</tr>
+<tr>
+<td>Distribution</td>
+<td>Always to voting council members (except expired with no votes)</td>
+</tr>
+<tr>
+<td>Minimum Claim</td>
+<td>1 USDC</td>
+</tr>
+<tr>
+<td>Maximum Claim</td>
+<td>1,000,000,000 USDC</td>
+</tr>
+</tbody></table>
+<p><strong>Incentive Alignment:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Incentive</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Council members</td>
+<td>Vote to receive deposit share; no bias toward approve/reject</td>
+</tr>
+<tr>
+<td>Claimants</td>
+<td>Only file legitimate claims (deposit always lost unless council inactive)</td>
+</tr>
+<tr>
+<td>Providers</td>
+<td>Protected from frivolous claims by deposit requirement</td>
+</tr>
+</tbody></table>
+<h3>11.3 Council Fees</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fee</td>
+<td>Percentage of approved payout (configurable per council)</td>
+</tr>
+<tr>
+<td>Recipient</td>
+<td>Council&#39;s feeRecipient address</td>
+</tr>
+<tr>
+<td>Calculation</td>
+<td><code>councilFeePercentage * effectivePayout / 10000</code></td>
+</tr>
+</tbody></table>
+<h3>11.4 Payout Caps</h3>
+<pre><code>Effective payout = min(approvedAmount, lockedAmount, maxPayoutPerClaim)
+</code></pre>
+<p>Where:</p>
+<ul>
+<li><code>approvedAmount</code>: Median of council approval votes</li>
+<li><code>lockedAmount</code>: Amount locked in CollateralVault at claim time</li>
+<li><code>maxPayoutPerClaim</code>: From T&amp;C document (off-chain, verified by council)</li>
+</ul>
+<hr>
+<h2 id="12off-chain-components">12. Off-Chain Components</h2>
+<h3>12.1 T&amp;C Document Schema</h3>
+<pre><code class="language-json">{
+  &quot;$schema&quot;: &quot;https://trustful-agents.org/schemas/terms/v1.3&quot;,
+  &quot;version&quot;: &quot;1.3&quot;,
+  &quot;agentId&quot;: &quot;123&quot;,
+  &quot;provider&quot;: {
+    &quot;name&quot;: &quot;Acme AI&quot;,
+    &quot;address&quot;: &quot;0x...&quot;
+  },
+  &quot;terms&quot;: {
+    &quot;serviceDescription&quot;: &quot;...&quot;,
+    &quot;limitations&quot;: [&quot;...&quot;],
+    &quot;maxPayoutPerClaim&quot;: &quot;5000000000&quot;,
+    &quot;coveredDamages&quot;: [&quot;...&quot;],
+    &quot;excludedDamages&quot;: [&quot;...&quot;]
+  },
+  &quot;legal&quot;: {
+    &quot;jurisdiction&quot;: &quot;...&quot;,
+    &quot;governingLaw&quot;: &quot;...&quot;
+  },
+  &quot;signature&quot;: {
+    &quot;hash&quot;: &quot;0x...&quot;,
+    &quot;timestamp&quot;: &quot;2026-01-30T00:00:00Z&quot;
+  }
+}
+</code></pre>
+<h3>12.2 Evidence Package Schema</h3>
+<pre><code class="language-json">{
+  &quot;$schema&quot;: &quot;https://trustful-agents.org/schemas/evidence/v1.3&quot;,
+  &quot;claimId&quot;: &quot;123&quot;,
+  &quot;paymentProof&quot;: {
+    &quot;type&quot;: &quot;x402|crypto|fiat|other&quot;,
+    &quot;x402Receipt&quot;: &quot;...&quot;,
+    &quot;transactionHash&quot;: &quot;0x...&quot;,
+    &quot;amount&quot;: &quot;100.00&quot;,
+    &quot;timestamp&quot;: &quot;2026-01-30T10:00:00Z&quot;
+  },
+  &quot;termsSnapshot&quot;: {
+    &quot;hash&quot;: &quot;0x...&quot;,
+    &quot;uri&quot;: &quot;ipfs://...&quot;,
+    &quot;maxPayoutPerClaim&quot;: &quot;5000000000&quot;
+  },
+  &quot;incident&quot;: {
+    &quot;description&quot;: &quot;...&quot;,
+    &quot;timestamp&quot;: &quot;2026-01-30T09:00:00Z&quot;,
+    &quot;logs&quot;: [&quot;...&quot;]
+  },
+  &quot;damages&quot;: {
+    &quot;description&quot;: &quot;...&quot;,
+    &quot;amount&quot;: &quot;1000000000&quot;,
+    &quot;evidence&quot;: [&quot;ipfs://...&quot;]
+  }
+}
+</code></pre>
+<h3>12.3 A2A Agent Card Extension</h3>
+<pre><code class="language-json">{
+  &quot;trustful&quot;: {
+    &quot;version&quot;: &quot;1.3&quot;,
+    &quot;validatorAddress&quot;: &quot;0x...&quot;,
+    &quot;collateral&quot;: {
+      &quot;amount&quot;: &quot;10000000000&quot;,
+      &quot;asset&quot;: &quot;USDC&quot;,
+      &quot;withdrawalPending&quot;: false
+    },
+    &quot;terms&quot;: {
+      &quot;hash&quot;: &quot;0x...&quot;,
+      &quot;uri&quot;: &quot;ipfs://...&quot;,
+      &quot;councilId&quot;: &quot;0x...&quot;,
+      &quot;maxPayoutPerClaim&quot;: &quot;5000000000&quot;
+    },
+    &quot;validation&quot;: {
+      &quot;status&quot;: &quot;valid&quot;,
+      &quot;issuedAt&quot;: &quot;2026-01-01T00:00:00Z&quot;
+    },
+    &quot;claims&quot;: {
+      &quot;total&quot;: 2,
+      &quot;approved&quot;: 0,
+      &quot;pending&quot;: 1
+    }
+  }
+}
+</code></pre>
+<hr>
+<h2 id="13security-considerations">13. Security Considerations</h2>
+<h3>13.1 Access Control Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Access Level</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Collateral deposit</td>
+<td>Anyone</td>
+</tr>
+<tr>
+<td>Collateral withdraw</td>
+<td>Agent owner</td>
+</tr>
+<tr>
+<td>T&amp;C registration</td>
+<td>Agent owner</td>
+</tr>
+<tr>
+<td>Claim filing</td>
+<td>Anyone</td>
+</tr>
+<tr>
+<td>Evidence submission</td>
+<td>Claimant / Provider</td>
+</tr>
+<tr>
+<td>Voting</td>
+<td>Council members only</td>
+</tr>
+<tr>
+<td>Vote changing</td>
+<td>Council members (own vote only)</td>
+</tr>
+<tr>
+<td>Claim finalization</td>
+<td>Anyone (permissionless)</td>
+</tr>
+<tr>
+<td>Claim execution</td>
+<td>Anyone (permissionless)</td>
+</tr>
+<tr>
+<td>Council management</td>
+<td>Governance multisig</td>
+</tr>
+<tr>
+<td>System pause</td>
+<td>Governance multisig</td>
+</tr>
+</tbody></table>
+<h3>13.2 Attack Vectors &amp; Mitigations</h3>
+<table>
+<thead>
+<tr>
+<th>Attack</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Front-running withdrawal</td>
+<td>7-day grace period</td>
+</tr>
+<tr>
+<td>Spam claims</td>
+<td>Deposit requirement</td>
+</tr>
+<tr>
+<td>Council collusion</td>
+<td>Unbiased deposit distribution (voters always paid)</td>
+</tr>
+<tr>
+<td>Sybil attacks on council</td>
+<td>Governance-controlled membership, max 11 members</td>
+</tr>
+<tr>
+<td>T&amp;C version gaming</td>
+<td>Hash binding at claim time</td>
+</tr>
+<tr>
+<td>Unbounded gas loops</td>
+<td>Council member limit (11 max)</td>
+</tr>
+<tr>
+<td>Integer overflow/underflow</td>
+<td>OpenZeppelin SafeMath, Solidity 0.8+</td>
+</tr>
+<tr>
+<td>Reentrancy</td>
+<td>ReentrancyGuard on state-changing functions</td>
+</tr>
+</tbody></table>
+<h3>13.3 Validation Conditions</h3>
+<p>Validation requires ALL conditions:</p>
+<ul>
+<li><code>hasCollateral</code>: Available balance &gt; 0</li>
+<li><code>hasActiveTerms</code>: Non-invalidated T&amp;C exists</li>
+<li><code>ownershipValid</code>: Current owner matches owner at validation time</li>
+<li><code>councilIsActive</code>: Assigned council is active</li>
+</ul>
+<h3>13.4 API Security</h3>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Authentication</td>
+<td>SIWE (Sign-In with Ethereum)</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Safe owner verification</td>
+</tr>
+<tr>
+<td>Rate Limiting</td>
+<td>100 req/15min (20 for auth)</td>
+</tr>
+<tr>
+<td>Input Validation</td>
+<td>Zod schemas</td>
+</tr>
+<tr>
+<td>SQL Injection</td>
+<td>Parameterized queries</td>
+</tr>
+<tr>
+<td>CORS</td>
+<td>Restricted to dashboard origins</td>
+</tr>
+<tr>
+<td>Headers</td>
+<td>Helmet security headers</td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td>Environment variables</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="14deployment-architecture">14. Deployment Architecture</h2>
+<h3>14.1 Infrastructure</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           DEPLOYMENT TOPOLOGY                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  AWS SERVER                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                           Nginx Reverse Proxy                           │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │   │
+│  │  │ provider.   │  │ claims.     │  │ council.    │  │ api.        │    │   │
+│  │  │ trustful-   │  │ trustful-   │  │ trustful-   │  │ trustful-   │    │   │
+│  │  │ agents.ai   │  │ agents.ai   │  │ agents.ai   │  │ agents.ai   │    │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘    │   │
+│  │         │                │                │                │           │   │
+│  └─────────┼────────────────┼────────────────┼────────────────┼───────────┘   │
+│            │                │                │                │               │
+│  ┌─────────▼──────┐ ┌───────▼──────┐ ┌───────▼──────┐ ┌───────▼──────┐       │
+│  │ Provider       │ │ Claimer      │ │ Council      │ │ Governance   │       │
+│  │ Dashboard      │ │ Dashboard    │ │ Dashboard    │ │ API          │       │
+│  │ (pm2 :3003)    │ │ (pm2 :3004)  │ │ (pm2 :3002)  │ │ (pm2 :3001)  │       │
+│  └────────────────┘ └──────────────┘ └──────────────┘ └──────┬───────┘       │
+│                                                               │               │
+│                                                      ┌────────▼───────┐       │
+│                                                      │  PostgreSQL    │       │
+│                                                      │  Database      │       │
+│                                                      └────────────────┘       │
+│                                                                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+│                                                                                 │
+│  EXTERNAL SERVICES                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                 │
+│  │ The Graph       │  │ Base Sepolia    │  │ Safe            │                 │
+│  │ (Subgraph)      │  │ (Blockchain)    │  │ (Transaction    │                 │
+│  │                 │  │                 │  │  Service)       │                 │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘                 │
+│  ┌─────────────────┐                                                           │
+│  │ IPFS / Filecoin │◀── T&amp;C Documents (decentralized, content-addressed)       │
+│  │ (via gateway)   │                                                           │
+│  └─────────────────┘                                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>14.2 Service Ports</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Domain</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Governance API</td>
+<td>3001</td>
+<td>api.trustful-agents.ai</td>
+</tr>
+<tr>
+<td>Council Dashboard</td>
+<td>3002</td>
+<td>council.trustful-agents.ai</td>
+</tr>
+<tr>
+<td>Provider Dashboard</td>
+<td>3003</td>
+<td>provider.trustful-agents.ai</td>
+</tr>
+<tr>
+<td>Claimer Dashboard</td>
+<td>3004</td>
+<td>claims.trustful-agents.ai</td>
+</tr>
+</tbody></table>
+<h3>14.3 Contract Addresses (Base Sepolia)</h3>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CollateralVault</td>
+<td><code>0xC948389425061c2C960c034c1c9526E9E6f39ff9</code></td>
+</tr>
+<tr>
+<td>TermsRegistry</td>
+<td><code>0xBDc5328D4442A1e893CD2b1F75d3F64a3e50f923</code></td>
+</tr>
+<tr>
+<td>TrustfulValidator</td>
+<td><code>0x9628C1bD875C3378B14f0108b60B0b5739fE92E8</code></td>
+</tr>
+<tr>
+<td>CouncilRegistry</td>
+<td><code>0xAaA608c80168D90d77Ec5a7f72Fb939E7Add5C32</code></td>
+</tr>
+<tr>
+<td>ClaimsManager</td>
+<td><code>0x7B0465DF41c3649f88A627cF06941469BE9C7a44</code></td>
+</tr>
+<tr>
+<td>RulingExecutor</td>
+<td><code>0x2a49b1826810AefAfFf93eC9317A426BbF8DC11f</code></td>
+</tr>
+</tbody></table>
+<h3>14.4 Process Management</h3>
+<p>All services managed via pm2:</p>
+<pre><code class="language-bash"># Start all services
+pm2 start ecosystem.config.js
+
+# View status
+pm2 status
+
+# View logs
+pm2 logs governance-api
+</code></pre>
+<h3>14.5 Nginx Configuration</h3>
+<pre><code class="language-nginx"># Example for API
+server {
+    listen 443 ssl;
+    server_name api.trustful-agents.ai;
+    
+    ssl_certificate /etc/letsencrypt/live/trustful-agents.ai/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/trustful-agents.ai/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection &#39;upgrade&#39;;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+</code></pre>
+<hr>
+<h2 id="15open-items-amp-future-work">15. Open Items &amp; Future Work</h2>
+<h3>15.1 Completed (v1.3)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Deploy contracts to Base Sepolia</li>
+<li><input checked="" disabled="" type="checkbox"> Implement subgraph for indexing</li>
+<li><input checked="" disabled="" type="checkbox"> Build provider dashboard with A2A Agent Cards</li>
+<li><input checked="" disabled="" type="checkbox"> Build claimer dashboard</li>
+<li><input checked="" disabled="" type="checkbox"> Build council dashboard</li>
+<li><input checked="" disabled="" type="checkbox"> Build governance dashboard with Safe integration</li>
+<li><input checked="" disabled="" type="checkbox"> Implement Governance API with SIWE auth</li>
+<li><input checked="" disabled="" type="checkbox"> Evidence storage in PostgreSQL</li>
+<li><input checked="" disabled="" type="checkbox"> Audit fixes (gas safety, bounds checking)</li>
+</ul>
+<h3>15.2 Future Enhancements</h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Enhancement</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>High</td>
+<td>Mainnet Deployment</td>
+<td>Deploy to Base mainnet</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Production Subgraph</td>
+<td>Deploy to The Graph Network</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Email Notifications</td>
+<td>Alert council members of new claims</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Mobile Apps</td>
+<td>Native mobile experience</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Batch Voting</td>
+<td>Vote on multiple claims at once</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Multi-chain</td>
+<td>Cross-chain collateral and claims</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Stake-weighted Voting</td>
+<td>Votes weighted by stake</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Council Reputation</td>
+<td>Reputation scores based on voting history</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>DAO Governance</td>
+<td>Replace multisig with DAO</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Automated Evidence</td>
+<td>AI-assisted evidence validation</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="appendix-a-event-reference">Appendix A: Event Reference</h2>
+<h3>CollateralVault Events</h3>
+<pre><code class="language-solidity">event Deposited(uint256 indexed agentId, address indexed depositor, uint256 amount);
+event WithdrawalInitiated(uint256 indexed agentId, uint256 amount, uint256 executeAfter);
+event WithdrawalCancelled(uint256 indexed agentId);
+event WithdrawalExecuted(uint256 indexed agentId, address indexed recipient, uint256 amount);
+event CollateralLocked(uint256 indexed agentId, uint256 claimId, uint256 amount);
+event CollateralUnlocked(uint256 indexed agentId, uint256 claimId, uint256 amount);
+event CollateralSlashed(uint256 indexed agentId, uint256 claimId, address indexed recipient, uint256 amount);
+</code></pre>
+<h3>TermsRegistry Events</h3>
+<pre><code class="language-solidity">event TermsRegistered(uint256 indexed agentId, uint256 indexed version, bytes32 contentHash, string contentUri, bytes32 councilId);
+event TermsActivated(uint256 indexed agentId, uint256 indexed version);
+event TermsDeactivated(uint256 indexed agentId, uint256 indexed version);
+</code></pre>
+<h3>TrustfulValidator Events</h3>
+<pre><code class="language-solidity">event ValidationIssued(uint256 indexed agentId, bytes32 indexed requestHash, uint256 timestamp, string conditions);
+event ValidationRevoked(uint256 indexed agentId, bytes32 indexed requestHash, uint8 reason);
+</code></pre>
+<h3>CouncilRegistry Events</h3>
+<pre><code class="language-solidity">event CouncilCreated(bytes32 indexed councilId, string name, string vertical, uint256 votingPeriod, uint256 evidencePeriod);
+event CouncilUpdated(bytes32 indexed councilId);
+event CouncilDeactivated(bytes32 indexed councilId);
+event CouncilActivated(bytes32 indexed councilId);
+event CouncilClosed(bytes32 indexed councilId, uint256 closedAt);
+event MemberAdded(bytes32 indexed councilId, address indexed member);
+event MemberRemoved(bytes32 indexed councilId, address indexed member);
+</code></pre>
+<h3>ClaimsManager Events</h3>
+<pre><code class="language-solidity">event ClaimFiled(uint256 indexed claimId, uint256 indexed agentId, address indexed claimant, uint256 claimedAmount, uint256 depositAmount, bytes32 councilId);
+event EvidenceSubmitted(uint256 indexed claimId, bytes32 evidenceHash, string evidenceUri, bool isCounterEvidence);
+event VoteCast(uint256 indexed claimId, address indexed voter, uint8 vote, uint256 approvedAmount);
+event VoteChanged(uint256 indexed claimId, address indexed voter, uint8 oldVote, uint8 newVote, uint256 oldAmount, uint256 newAmount);
+event ClaimApproved(uint256 indexed claimId, uint256 approvedAmount);
+event ClaimRejected(uint256 indexed claimId);
+event ClaimCancelled(uint256 indexed claimId, uint256 depositForfeited);
+event ClaimExpired(uint256 indexed claimId, bool hadVotes);
+event ClaimExecuted(uint256 indexed claimId, uint256 compensationPaid);
+</code></pre>
+<h3>RulingExecutor Events</h3>
+<pre><code class="language-solidity">event ClaimExecuted(uint256 indexed claimId, uint256 indexed agentId, address indexed claimant, uint256 compensation, uint256 councilFee);
+event DepositDistributed(uint256 indexed claimId, uint256 voterCount, uint256 totalAmount, uint256 perVoter);
+event DepositReturned(uint256 indexed claimId, address indexed claimant, uint256 amount, string reason);
+event CollateralUnlocked(uint256 indexed claimId, uint256 indexed agentId, uint256 amount);
+</code></pre>
+<hr>
+<h2 id="appendix-b-governance-functions-summary">Appendix B: Governance Functions Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Contract</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>createCouncil(...)</code></td>
+<td>CouncilRegistry</td>
+<td>Create new council</td>
+</tr>
+<tr>
+<td><code>closeCouncil(councilId)</code></td>
+<td>CouncilRegistry</td>
+<td>Close council</td>
+</tr>
+<tr>
+<td><code>addMember(councilId, member)</code></td>
+<td>CouncilRegistry</td>
+<td>Add member (max 11)</td>
+</tr>
+<tr>
+<td><code>removeMember(councilId, member)</code></td>
+<td>CouncilRegistry</td>
+<td>Remove member</td>
+</tr>
+<tr>
+<td><code>pause(reason)</code></td>
+<td>TrustfulPausable</td>
+<td>Emergency pause</td>
+</tr>
+<tr>
+<td><code>unpause()</code></td>
+<td>TrustfulPausable</td>
+<td>Resume operations</td>
+</tr>
+</tbody></table>
+<p>All governance functions require 2-of-3 multisig confirmation via Safe.</p>
+<hr>
+<h2 id="appendix-c-api-endpoints-summary">Appendix C: API Endpoints Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/auth/nonce</code></td>
+<td>GET</td>
+<td>Get SIWE nonce</td>
+</tr>
+<tr>
+<td><code>/auth/login</code></td>
+<td>POST</td>
+<td>Login with SIWE signature</td>
+</tr>
+<tr>
+<td><code>/auth/logout</code></td>
+<td>POST</td>
+<td>Invalidate session</td>
+</tr>
+<tr>
+<td><code>/auth/me</code></td>
+<td>GET/PUT</td>
+<td>Get/update profile</td>
+</tr>
+<tr>
+<td><code>/councils</code></td>
+<td>GET</td>
+<td>List active councils</td>
+</tr>
+<tr>
+<td><code>/councils/:id</code></td>
+<td>GET</td>
+<td>Get council details</td>
+</tr>
+<tr>
+<td><code>/councils/:id/members</code></td>
+<td>GET/POST/DELETE</td>
+<td>Manage members</td>
+</tr>
+<tr>
+<td><code>/claims</code></td>
+<td>GET</td>
+<td>List claims with filters</td>
+</tr>
+<tr>
+<td><code>/claims/:id</code></td>
+<td>GET</td>
+<td>Get claim details</td>
+</tr>
+<tr>
+<td><code>/claims/:id/votes</code></td>
+<td>GET</td>
+<td>Get votes for claim</td>
+</tr>
+<tr>
+<td><code>/claims/:id/evidence</code></td>
+<td>POST</td>
+<td>Submit evidence</td>
+</tr>
+<tr>
+<td><code>/safe/info</code></td>
+<td>GET</td>
+<td>Get Safe multisig info</td>
+</tr>
+<tr>
+<td><code>/safe/pending</code></td>
+<td>GET</td>
+<td>List pending transactions</td>
+</tr>
+<tr>
+<td><code>/pending</code></td>
+<td>GET/POST</td>
+<td>Manage pending transaction metadata</td>
+</tr>
+<tr>
+<td><code>/agents/:id</code></td>
+<td>GET</td>
+<td>Get agent info</td>
+</tr>
+<tr>
+<td><code>/v1/validation/:id</code></td>
+<td>GET</td>
+<td>Get validation status</td>
+</tr>
+<tr>
+<td><code>/provider/agents</code></td>
+<td>GET</td>
+<td>List provider&#39;s agents</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>Document maintained by the Trustful Agents team. Last updated: 2026-01-30</em></p>
+
+    </div>
+  </main>
+
+  <button class="mobile-toggle" id="menuToggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+    ☰
+  </button>
+
+  <script>
+    // Highlight current section in TOC
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
+          const id = entry.target.id;
+          const link = document.querySelector(`.toc a[href="#${id}"]`);
+          if (link) link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-100px 0px -70% 0px' });
+
+    document.querySelectorAll('h1[id], h2[id]').forEach(h => observer.observe(h));
+
+    // Close sidebar on link click (mobile)
+    document.querySelectorAll('.toc a').forEach(a => {
+      a.addEventListener('click', () => {
+        if (window.innerWidth <= 1024) {
+          document.getElementById('sidebar').classList.remove('open');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

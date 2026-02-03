@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Documentation - Trustful Agents</title>
+  <meta name="description" content="Technical documentation for developers integrating with Trustful Agents smart contracts and API.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --surface-100: #f8fafc;
+      --surface-200: #e2e8f0;
+      --surface-300: #cbd5e1;
+      --surface-400: #94a3b8;
+      --surface-500: #64748b;
+      --surface-600: #475569;
+      --surface-700: #334155;
+      --surface-800: #1e293b;
+      --accent: #3b82f6;
+      --accent-light: #60a5fa;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--surface-200);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--surface-800);
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--surface-100);
+    }
+
+    .logo-text span {
+      color: var(--surface-400);
+      font-weight: 400;
+    }
+
+    .back-link {
+      color: var(--surface-400);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--surface-100);
+    }
+
+    /* Content */
+    .content {
+      padding: 60px 0;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .page-header h1 {
+      font-size: 36px;
+      color: var(--surface-100);
+      margin-bottom: 16px;
+    }
+
+    .page-header p {
+      color: var(--surface-400);
+      font-size: 18px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Doc Cards */
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .doc-card {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-800);
+      border-radius: 16px;
+      padding: 32px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .doc-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -20px rgba(59, 130, 246, 0.3);
+    }
+
+    .doc-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(59, 130, 246, 0.15);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 24px;
+    }
+
+    .doc-card.api .doc-icon {
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .doc-card.architecture .doc-icon {
+      background: rgba(139, 92, 246, 0.15);
+    }
+
+    .doc-card h2 {
+      font-size: 22px;
+      color: var(--surface-100);
+      margin-bottom: 12px;
+    }
+
+    .doc-card p {
+      color: var(--surface-400);
+      font-size: 15px;
+      flex: 1;
+      margin-bottom: 24px;
+    }
+
+    .doc-card ul {
+      list-style: none;
+      margin-bottom: 24px;
+    }
+
+    .doc-card ul li {
+      color: var(--surface-400);
+      font-size: 14px;
+      padding: 6px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .doc-card ul li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--success);
+    }
+
+    .doc-card .download {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .doc-card .download svg {
+      transition: transform 0.2s;
+    }
+
+    .doc-card:hover .download svg {
+      transform: translateY(2px);
+    }
+
+    .doc-meta {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--surface-800);
+    }
+
+    .doc-meta span {
+      font-size: 12px;
+      color: var(--surface-500);
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--surface-800);
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--surface-500);
+      font-size: 14px;
+    }
+
+    footer a {
+      color: var(--surface-400);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--surface-100);
+    }
+
+    @media (max-width: 640px) {
+      .docs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header h1 {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-content">
+        <a href="/" class="logo">
+          <div class="logo-icon">🤖</div>
+          <div class="logo-text">Trustful <span>Agents</span></div>
+        </a>
+        <a href="/" class="back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Home
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="container">
+      <div class="page-header">
+        <h1>📚 Developer Documentation</h1>
+        <p>
+          Technical documentation for integrating with Trustful Agents smart contracts and Governance API.
+        </p>
+      </div>
+
+      <div class="docs-grid">
+        <a href="smart-contracts.pdf" class="doc-card contracts" target="_blank">
+          <div class="doc-icon">📜</div>
+          <h2>Smart Contracts</h2>
+          <p>
+            Complete documentation for all Trustful Agents smart contracts deployed on Base Sepolia.
+          </p>
+          <ul>
+            <li>CollateralVault</li>
+            <li>TermsRegistry</li>
+            <li>CouncilRegistry</li>
+            <li>ClaimsManager</li>
+            <li>RulingExecutor</li>
+            <li>TrustfulValidator</li>
+          </ul>
+          <div class="download">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download PDF
+          </div>
+          <div class="doc-meta">
+            <span>Version 1.3</span>
+            <span>January 2026</span>
+          </div>
+        </a>
+
+        <a href="API-Documentation.pdf" class="doc-card api" target="_blank">
+          <div class="doc-icon">🔌</div>
+          <h2>Governance API</h2>
+          <p>
+            REST API documentation for the backend services powering all Trustful Agents dashboards.
+          </p>
+          <ul>
+            <li>51 API Endpoints</li>
+            <li>SIWE Authentication</li>
+            <li>Claims & Voting</li>
+            <li>Council Management</li>
+            <li>Safe Multisig Integration</li>
+            <li>A2A Protocol (Agent Cards)</li>
+          </ul>
+          <div class="download">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download PDF
+          </div>
+          <div class="doc-meta">
+            <span>Version 1.3</span>
+            <span>January 2026</span>
+          </div>
+        </a>
+
+        <a href="architecture.html" class="doc-card architecture">
+          <div class="doc-icon">🏗️</div>
+          <h2>Architecture Specification</h2>
+          <p>
+            Complete system architecture including design decisions, data flows, and deployment infrastructure.
+          </p>
+          <ul>
+            <li>System Overview</li>
+            <li>Smart Contract Architecture</li>
+            <li>Dashboard Applications</li>
+            <li>Backend Services</li>
+            <li>Economic Model</li>
+            <li>Security & Deployment</li>
+          </ul>
+          <div class="download">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+            </svg>
+            View Documentation
+          </div>
+          <div class="doc-meta">
+            <span>Version 1.3</span>
+            <span>1,600+ lines</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>
+        Built by <a href="https://github.com/3andAI" target="_blank">3andAI</a> · 
+        <a href="https://github.com/3andAI/trustful-agents" target="_blank">GitHub</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

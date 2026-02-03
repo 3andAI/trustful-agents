@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How It Works - Trustful Agents</title>
+  <meta name="description" content="Learn how Trustful Agents works for Providers, Claimants, Council Members, and Governance.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --surface-100: #f8fafc;
+      --surface-200: #e2e8f0;
+      --surface-300: #cbd5e1;
+      --surface-400: #94a3b8;
+      --surface-500: #64748b;
+      --surface-600: #475569;
+      --surface-700: #334155;
+      --surface-800: #1e293b;
+      --accent: #3b82f6;
+      --accent-light: #60a5fa;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--surface-200);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--surface-800);
+      position: sticky;
+      top: 0;
+      background: var(--bg-primary);
+      z-index: 100;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--surface-100);
+    }
+
+    .logo-text span {
+      color: var(--surface-400);
+      font-weight: 400;
+    }
+
+    .back-link {
+      color: var(--surface-400);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--surface-100);
+    }
+
+    /* Page Header */
+    .page-header {
+      padding: 60px 0 40px;
+      text-align: center;
+      border-bottom: 1px solid var(--surface-800);
+    }
+
+    .page-header h1 {
+      font-size: 36px;
+      color: var(--surface-100);
+      margin-bottom: 16px;
+    }
+
+    .page-header p {
+      color: var(--surface-400);
+      font-size: 18px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Navigation Tabs */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--surface-800);
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      padding: 12px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--surface-800);
+      border-radius: 8px;
+      color: var(--surface-400);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .tab:hover {
+      border-color: var(--surface-600);
+      color: var(--surface-200);
+    }
+
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .tab .icon {
+      font-size: 16px;
+    }
+
+    /* Content Sections */
+    .section {
+      display: none;
+      padding: 48px 0;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .section-header h2 {
+      font-size: 28px;
+      color: var(--surface-100);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .section-header p {
+      color: var(--surface-400);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Workflow Diagram */
+    .workflow-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-800);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 48px;
+      overflow-x: auto;
+    }
+
+    .workflow-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    /* Steps */
+    .steps {
+      display: grid;
+      gap: 24px;
+    }
+
+    .step {
+      background: var(--bg-card);
+      border: 1px solid var(--surface-800);
+      border-radius: 16px;
+      padding: 28px;
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 24px;
+      transition: all 0.2s;
+    }
+
+    .step:hover {
+      border-color: var(--surface-700);
+    }
+
+    .step-number {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .step-content h3 {
+      font-size: 20px;
+      color: var(--surface-100);
+      margin-bottom: 12px;
+    }
+
+    .step-content p {
+      color: var(--surface-400);
+      margin-bottom: 16px;
+    }
+
+    .step-details {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .step-details ul {
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    .step-details li {
+      color: var(--surface-300);
+      font-size: 14px;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .step-details li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    /* Color coding for different roles */
+    .section[data-role="provider"] .step-number {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    }
+
+    .section[data-role="claimant"] .step-number {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .section[data-role="council"] .step-number {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    .section[data-role="governance"] .step-number {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+
+    /* Key Points */
+    .key-points {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    .key-point {
+      background: var(--bg-secondary);
+      border: 1px solid var(--surface-800);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .key-point h4 {
+      color: var(--surface-100);
+      font-size: 15px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .key-point p {
+      color: var(--surface-400);
+      font-size: 14px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--surface-800);
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--surface-500);
+      font-size: 14px;
+    }
+
+    footer a {
+      color: var(--surface-400);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--surface-100);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .step {
+        grid-template-columns: 1fr;
+      }
+
+      .step-number {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+      }
+
+      .tabs {
+        gap: 6px;
+      }
+
+      .tab {
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+
+      .page-header h1 {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-content">
+        <a href="/" class="logo">
+          <div class="logo-icon">🤖</div>
+          <div class="logo-text">Trustful <span>Agents</span></div>
+        </a>
+        <a href="/" class="back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Home
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-header">
+    <div class="container">
+      <h1>📖 How It Works</h1>
+      <p>
+        Step-by-step workflows for each role in the Trustful Agents ecosystem. 
+        Select your role below to see the complete process.
+      </p>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a href="#provider" class="tab active" data-tab="provider">
+      <span class="icon">🤖</span> Provider
+    </a>
+    <a href="#claimant" class="tab" data-tab="claimant">
+      <span class="icon">📋</span> Claimant
+    </a>
+    <a href="#council" class="tab" data-tab="council">
+      <span class="icon">⚖️</span> Council Member
+    </a>
+    <a href="#governance" class="tab" data-tab="governance">
+      <span class="icon">🏛️</span> Governance
+    </a>
+  </nav>
+
+  <main>
+    <!-- Provider Section -->
+    <section id="provider" class="section active" data-role="provider">
+      <div class="container">
+        <div class="section-header">
+          <h2><span>🤖</span> Provider Workflow</h2>
+          <p>Register your AI agent, deposit collateral, and build trust with clients through verifiable commitments.</p>
+        </div>
+
+        <div class="workflow-diagram">
+          <svg viewBox="0 0 900 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="providerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#3b82f6"/>
+                <stop offset="100%" style="stop-color:#1d4ed8"/>
+              </linearGradient>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.3"/>
+              </filter>
+            </defs>
+            <rect x="20" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="100" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">1. Mint Agent</text>
+            <text x="100" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">ERC-8004 NFT</text>
+            <path d="M180 70 L220 70" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow)"/>
+            <rect x="220" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="300" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">2. Deposit Collateral</text>
+            <text x="300" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">USDC to Vault</text>
+            <path d="M380 70 L420 70" stroke="#3b82f6" stroke-width="2"/>
+            <rect x="420" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="500" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">3. Register T&amp;C</text>
+            <text x="500" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">IPFS + On-chain</text>
+            <path d="M580 70 L620 70" stroke="#3b82f6" stroke-width="2"/>
+            <rect x="620" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="700" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">4. Get Validated</text>
+            <text x="700" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">ERC-8004 Status</text>
+            <circle cx="820" cy="70" r="30" fill="url(#providerGrad)" filter="url(#shadow)"/>
+            <text x="820" y="76" text-anchor="middle" fill="white" font-size="20">✓</text>
+            <path d="M780 70 L790 70" stroke="#3b82f6" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Mint Your Agent NFT</h3>
+              <p>Create an ERC-8004 compliant NFT representing your AI agent. This establishes on-chain identity and enables trust validation.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Connect your wallet to the Provider Dashboard</li>
+                  <li>Enter agent metadata (name, description, capabilities)</li>
+                  <li>Mint the ERC-8004 token on Base</li>
+                  <li>Receive your unique Agent ID</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Deposit USDC Collateral</h3>
+              <p>Back your agent's commitments with real economic stake. Collateral serves as guarantee for potential claims.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Approve USDC spending for CollateralVault</li>
+                  <li>Deposit desired amount (recommended: cover expected claim values)</li>
+                  <li>Collateral is locked but remains yours</li>
+                  <li>7-day grace period for withdrawals prevents front-running</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Register Terms & Conditions</h3>
+              <p>Publish your service commitments on-chain. These define what your agent promises and form the basis for any disputes.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Write your Terms & Conditions document</li>
+                  <li>Upload to IPFS for permanent storage</li>
+                  <li>Register content hash on-chain for verification</li>
+                  <li>Select a dispute resolution council</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Receive Validation</h3>
+              <p>Once collateral and T&C are in place, your agent receives ERC-8004 validation status that clients can verify.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Request validation from TrustfulValidator</li>
+                  <li>System verifies collateral and T&C requirements</li>
+                  <li>Validation status recorded on-chain</li>
+                  <li>Clients can now verify your agent's trust credentials</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="key-points">
+          <div class="key-point">
+            <h4>💰 Collateral Protection</h4>
+            <p>Your collateral is only at risk if you violate your own published T&C and a claim is approved.</p>
+          </div>
+          <div class="key-point">
+            <h4>⏱️ Withdrawal Grace Period</h4>
+            <p>7-day waiting period prevents withdrawing collateral after learning about potential claims.</p>
+          </div>
+          <div class="key-point">
+            <h4>📝 Version History</h4>
+            <p>All T&C versions are preserved. Claims reference the version active when the issue occurred.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Claimant Section -->
+    <section id="claimant" class="section" data-role="claimant">
+      <div class="container">
+        <div class="section-header">
+          <h2><span>📋</span> Claimant Workflow</h2>
+          <p>File a claim when an AI agent fails to meet its published Terms & Conditions and causes you damages.</p>
+        </div>
+
+        <div class="workflow-diagram">
+          <svg viewBox="0 0 900 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="claimantGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#f59e0b"/>
+                <stop offset="100%" style="stop-color:#d97706"/>
+              </linearGradient>
+            </defs>
+            <rect x="20" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="100" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">1. File Claim</text>
+            <text x="100" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Pay Deposit</text>
+            <path d="M180 70 L220 70" stroke="#f59e0b" stroke-width="2"/>
+            <rect x="220" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="300" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">2. Evidence Period</text>
+            <text x="300" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Submit Proof</text>
+            <path d="M380 70 L420 70" stroke="#f59e0b" stroke-width="2"/>
+            <rect x="420" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="500" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">3. Council Votes</text>
+            <text x="500" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Review &amp; Decide</text>
+            <path d="M580 70 L620 70" stroke="#f59e0b" stroke-width="2"/>
+            <rect x="620" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="700" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">4. Resolution</text>
+            <text x="700" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Funds Transfer</text>
+            <circle cx="820" cy="70" r="30" fill="url(#claimantGrad)" filter="url(#shadow)"/>
+            <text x="820" y="76" text-anchor="middle" fill="white" font-size="20">💰</text>
+            <path d="M780 70 L790 70" stroke="#f59e0b" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>File Your Claim</h3>
+              <p>Submit a claim against an agent that violated its Terms & Conditions. A deposit is required to prevent frivolous claims.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Connect wallet and navigate to Claimer Dashboard</li>
+                  <li>Enter the Agent ID and claimed amount</li>
+                  <li>Pay the required deposit (percentage of claim)</li>
+                  <li>Agent's collateral is locked for the claim amount</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Submit Evidence</h3>
+              <p>During the evidence period, provide documentation proving the agent violated its T&C and caused damages.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Upload transaction receipts, screenshots, logs</li>
+                  <li>Describe the T&C violation in detail</li>
+                  <li>Provider can also submit counter-evidence</li>
+                  <li>Evidence period typically lasts 3 days</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Council Review & Voting</h3>
+              <p>Council members review all evidence and vote on whether to approve, reject, or partially approve the claim.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Council members review evidence from both parties</li>
+                  <li>Each member votes: Approve, Reject, or Abstain</li>
+                  <li>For approvals, members specify the amount</li>
+                  <li>Voting period typically lasts 7 days</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Claim Resolution</h3>
+              <p>After voting ends, the claim is finalized and funds are distributed according to the council's decision.</p>
+              <div class="step-details">
+                <ul>
+                  <li>If approved: receive the approved amount from agent's collateral</li>
+                  <li>If rejected: collateral is unlocked, returned to provider</li>
+                  <li>Your deposit goes to council members who voted (either outcome)</li>
+                  <li>If no votes cast: deposit is returned to you</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="key-points">
+          <div class="key-point">
+            <h4>💸 Deposit Requirement</h4>
+            <p>Deposits prevent spam claims and compensate council members for their review work.</p>
+          </div>
+          <div class="key-point">
+            <h4>⚖️ Partial Awards</h4>
+            <p>Councils can approve less than the full claimed amount based on actual proven damages.</p>
+          </div>
+          <div class="key-point">
+            <h4>🔒 Collateral Lock</h4>
+            <p>The claimed amount is locked immediately, preventing provider withdrawal during dispute.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Council Section -->
+    <section id="council" class="section" data-role="council">
+      <div class="container">
+        <div class="section-header">
+          <h2><span>⚖️</span> Council Member Workflow</h2>
+          <p>Review claims, evaluate evidence, and vote on dispute resolutions as a trusted council member.</p>
+        </div>
+
+        <div class="workflow-diagram">
+          <svg viewBox="0 0 900 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="councilGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#22c55e"/>
+                <stop offset="100%" style="stop-color:#16a34a"/>
+              </linearGradient>
+            </defs>
+            <rect x="20" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="100" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">1. Get Assigned</text>
+            <text x="100" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Join Council</text>
+            <path d="M180 70 L220 70" stroke="#22c55e" stroke-width="2"/>
+            <rect x="220" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="300" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">2. Review Claims</text>
+            <text x="300" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Read Evidence</text>
+            <path d="M380 70 L420 70" stroke="#22c55e" stroke-width="2"/>
+            <rect x="420" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="500" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">3. Cast Vote</text>
+            <text x="500" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Approve/Reject</text>
+            <path d="M580 70 L620 70" stroke="#22c55e" stroke-width="2"/>
+            <rect x="620" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="700" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">4. Earn Deposit</text>
+            <text x="700" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Share Reward</text>
+            <circle cx="820" cy="70" r="30" fill="url(#councilGrad)" filter="url(#shadow)"/>
+            <text x="820" y="76" text-anchor="middle" fill="white" font-size="20">🏆</text>
+            <path d="M780 70 L790 70" stroke="#22c55e" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Get Added to a Council</h3>
+              <p>Council members are added by governance through Safe multisig proposals. Each council specializes in a vertical.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Apply or get nominated for council membership</li>
+                  <li>Governance proposes and approves addition</li>
+                  <li>Your address is added to CouncilRegistry</li>
+                  <li>Maximum 11 active members per council</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Review Pending Claims</h3>
+              <p>Monitor your council's pending claims and review all submitted evidence during the voting period.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Access Council Dashboard with your wallet</li>
+                  <li>View claims assigned to your council</li>
+                  <li>Read claimant's evidence and description</li>
+                  <li>Review provider's counter-evidence if any</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Cast Your Vote</h3>
+              <p>Submit your vote with reasoning. You can change your vote until the voting period ends.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Choose: Approve, Reject, or Abstain</li>
+                  <li>If approving, specify the amount (can be partial)</li>
+                  <li>Provide reasoning for your decision</li>
+                  <li>Change vote if new evidence changes your view</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Receive Deposit Share</h3>
+              <p>After claim resolution, the claimant's deposit is distributed equally among all council members who voted.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Deposit split equally among all voters</li>
+                  <li>Same reward regardless of vote outcome</li>
+                  <li>Incentivizes participation without bias</li>
+                  <li>Non-voters receive nothing</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="key-points">
+          <div class="key-point">
+            <h4>⚖️ Neutral Incentives</h4>
+            <p>You earn the same deposit share whether you approve or reject, ensuring unbiased decisions.</p>
+          </div>
+          <div class="key-point">
+            <h4>🔄 Vote Changes</h4>
+            <p>You can change your vote anytime during the voting period as new evidence emerges.</p>
+          </div>
+          <div class="key-point">
+            <h4>📊 Median Calculation</h4>
+            <p>Final approved amount is the median of all approval votes, preventing outlier manipulation.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Governance Section -->
+    <section id="governance" class="section" data-role="governance">
+      <div class="container">
+        <div class="section-header">
+          <h2><span>🏛️</span> Governance Workflow</h2>
+          <p>Manage councils, members, and agent assignments through Safe multisig proposals.</p>
+        </div>
+
+        <div class="workflow-diagram">
+          <svg viewBox="0 0 900 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="govGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#8b5cf6"/>
+                <stop offset="100%" style="stop-color:#7c3aed"/>
+              </linearGradient>
+            </defs>
+            <rect x="20" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="100" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">1. Create Proposal</text>
+            <text x="100" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">Generate TX</text>
+            <path d="M180 70 L220 70" stroke="#8b5cf6" stroke-width="2"/>
+            <rect x="220" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="300" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">2. Collect Signatures</text>
+            <text x="300" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">2-of-3 Required</text>
+            <path d="M380 70 L420 70" stroke="#8b5cf6" stroke-width="2"/>
+            <rect x="420" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="500" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">3. Execute TX</text>
+            <text x="500" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">On-chain Action</text>
+            <path d="M580 70 L620 70" stroke="#8b5cf6" stroke-width="2"/>
+            <rect x="620" y="30" width="160" height="80" rx="12" fill="#1a1a24" stroke="#334155" filter="url(#shadow)"/>
+            <text x="700" y="62" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600">4. Verify Result</text>
+            <text x="700" y="82" text-anchor="middle" fill="#94a3b8" font-size="11">State Updated</text>
+            <circle cx="820" cy="70" r="30" fill="url(#govGrad)" filter="url(#shadow)"/>
+            <text x="820" y="76" text-anchor="middle" fill="white" font-size="20">✓</text>
+            <path d="M780 70 L790 70" stroke="#8b5cf6" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Create Governance Proposal</h3>
+              <p>Safe multisig owners can propose governance actions through the Governance Dashboard.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Login with SIWE as a Safe owner</li>
+                  <li>Select action: Create Council, Add/Remove Member, Reassign Agent</li>
+                  <li>Fill in required parameters</li>
+                  <li>System generates encoded transaction data</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Collect Required Signatures</h3>
+              <p>Other Safe owners review and sign the proposal. 2-of-3 signatures required for execution.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Proposal appears in Safe Transaction Service</li>
+                  <li>Other owners review the proposed action</li>
+                  <li>Sign to approve or reject to decline</li>
+                  <li>Track confirmation count in dashboard</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Execute Transaction</h3>
+              <p>Once threshold is reached, any signer can execute the transaction on-chain.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Verify 2+ signatures collected</li>
+                  <li>Click Execute in dashboard or Safe app</li>
+                  <li>Confirm transaction in wallet</li>
+                  <li>Wait for blockchain confirmation</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Verify State Change</h3>
+              <p>Confirm the governance action was applied correctly on-chain.</p>
+              <div class="step-details">
+                <ul>
+                  <li>Check transaction receipt on block explorer</li>
+                  <li>Verify new state in relevant dashboard</li>
+                  <li>Council/member/agent changes are immediate</li>
+                  <li>Database metadata syncs automatically</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="key-points">
+          <div class="key-point">
+            <h4>🔐 Multisig Security</h4>
+            <p>2-of-3 threshold ensures no single party can make unilateral governance changes.</p>
+          </div>
+          <div class="key-point">
+            <h4>📝 Audit Trail</h4>
+            <p>All proposals and executions are logged for transparency and accountability.</p>
+          </div>
+          <div class="key-point">
+            <h4>⚡ Immediate Effect</h4>
+            <p>Once executed, governance changes take effect immediately on-chain.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>
+        Built by <a href="https://github.com/3andAI" target="_blank">3andAI</a> · 
+        <a href="/docs/developer.html">Developer Docs</a> · 
+        <a href="https://github.com/3andAI/trustful-agents" target="_blank">GitHub</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // Update active tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update active section
+        const targetId = tab.getAttribute('data-tab');
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(targetId).classList.add('active');
+        
+        // Update URL hash
+        history.pushState(null, null, `#${targetId}`);
+      });
+    });
+
+    // Handle initial hash
+    if (window.location.hash) {
+      const targetId = window.location.hash.slice(1);
+      const tab = document.querySelector(`[data-tab="${targetId}"]`);
+      if (tab) {
+        tab.click();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -5,30 +5,33 @@ import {
   Send, 
   Loader2,
   FileText,
-  ExternalLink,
+  Download,
   User,
   Bot,
   Shield,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
-import { formatAddress } from '../lib/api';
+import { formatAddress, canDisplayInline } from '../lib/api';
 
 const API_BASE = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || 'https://api.trustful-agents.ai');
 
-// Types
-export type AuthorRole = 'claimer' | 'provider' | 'councilor';
+// Types - v1.3: support both 'council' and 'councilor' (legacy)
+export type AuthorRole = 'claimer' | 'provider' | 'council';
+type AuthorRoleWithLegacy = AuthorRole | 'councilor';
 
 export interface ClaimMessage {
   id: string;
   claim_id: string;
   parent_id: string | null;
   author_address: string;
-  author_role: AuthorRole;
+  author_role: AuthorRole | 'councilor';  // support legacy
   content: string;
   evidence_hash: string | null;
-  evidence_uri: string | null;
+  // v1.3: DB-stored evidence
+  evidence_data: string | null;
   evidence_filename: string | null;
+  evidence_mimetype: string | null;
   evidence_size: number | null;
   created_at: string;
   replies: ClaimMessage[];
@@ -46,21 +49,15 @@ interface ConversationProps {
 }
 
 // Role colors and icons - adapted for council dashboard theme
-const roleConfig: Record<AuthorRole, { color: string; bgColor: string; icon: typeof User; label: string }> = {
+// Support both 'council' (v1.3) and 'councilor' (v1.2 legacy)
+const roleConfig: Record<AuthorRoleWithLegacy, { color: string; bgColor: string; icon: typeof User; label: string }> = {
   claimer: { color: 'text-amber-400', bgColor: 'bg-amber-400/20', icon: User, label: 'Claimer' },
   provider: { color: 'text-blue-400', bgColor: 'bg-blue-400/20', icon: Bot, label: 'Provider' },
-  councilor: { color: 'text-council', bgColor: 'bg-council/20', icon: Shield, label: 'Council' }
+  council: { color: 'text-council', bgColor: 'bg-council/20', icon: Shield, label: 'Council' },
+  councilor: { color: 'text-council', bgColor: 'bg-council/20', icon: Shield, label: 'Council' }  // legacy
 };
 
-// Convert IPFS URI to HTTP URL
-function ipfsToHttp(uri: string | null | undefined): string | null {
-  if (!uri) return null;
-  if (uri.startsWith('ipfs://')) {
-    const hash = uri.replace('ipfs://', '');
-    return `https://gateway.pinata.cloud/ipfs/${hash}`;
-  }
-  return uri;
-}
+const defaultRoleConfig = { color: 'text-governance-400', bgColor: 'bg-governance-700', icon: User, label: 'Unknown' };
 
 export default function ClaimConversation({
   claimId,
@@ -90,8 +87,9 @@ export default function ClaimConversation({
     author_role: 'claimer',
     content: initialDescription,
     evidence_hash: null,
-    evidence_uri: null,
+    evidence_data: null,
     evidence_filename: null,
+    evidence_mimetype: null,
     evidence_size: null,
     created_at: filedAt ? new Date(filedAt * 1000).toISOString() : new Date().toISOString(),
     replies: []
@@ -139,10 +137,10 @@ export default function ClaimConversation({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           authorAddress: currentUserAddress,
-          authorRole: 'councilor', // Council members always post as councilor
+          authorRole: 'councilor', // v1.3: use 'council' instead of 'councilor'
           content: content.trim(),
           parentId: replyingTo,
-          // Councilors cannot attach evidence
+          // Council members cannot attach evidence
         })
       });
       
@@ -293,7 +291,7 @@ function MessageThread({
   depth: number;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const config = roleConfig[message.author_role];
+  const config = roleConfig[message.author_role as AuthorRoleWithLegacy] || defaultRoleConfig;
   const Icon = config.icon;
   
   const hasReplies = message.replies && message.replies.length > 0;
@@ -302,7 +300,18 @@ function MessageThread({
   const getDisplayName = () => {
     if (message.author_role === 'claimer') return 'Claimer';
     if (message.author_role === 'provider') return 'Provider';
-    return `Councilor ${formatAddress(message.author_address)}`;
+    return `Council ${formatAddress(message.author_address)}`;
+  };
+
+  // Handle evidence download
+  const handleDownload = () => {
+    if (!message.evidence_data || !message.evidence_filename) return;
+    const link = document.createElement('a');
+    link.href = message.evidence_data;
+    link.download = message.evidence_filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -345,10 +354,10 @@ function MessageThread({
         {/* Content */}
         <p className="text-governance-200 whitespace-pre-wrap">{message.content}</p>
         
-        {/* Evidence attachment */}
-        {message.evidence_uri && (
+        {/* Evidence attachment - v1.3: DB-stored */}
+        {message.evidence_data && (
           <div className="mt-3 p-3 bg-governance-900 rounded border border-governance-700">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-2">
               <FileText className="w-4 h-4 text-council" />
               <span className="text-sm text-governance-300">
                 {message.evidence_filename || 'Evidence file'}
@@ -358,17 +367,20 @@ function MessageThread({
                   ({(message.evidence_size / 1024).toFixed(1)}KB)
                 </span>
               )}
-              {ipfsToHttp(message.evidence_uri) && (
-                <a
-                  href={ipfsToHttp(message.evidence_uri)!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-council hover:text-council/80 ml-auto flex items-center gap-1 text-sm"
-                >
-                  View <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
+              <button
+                onClick={handleDownload}
+                className="text-council hover:text-council/80 ml-auto flex items-center gap-1 text-sm"
+              >
+                <Download className="w-3 h-3" /> Download
+              </button>
             </div>
+            {canDisplayInline(message.evidence_mimetype) && (
+              <img 
+                src={message.evidence_data} 
+                alt={message.evidence_filename || 'Evidence'} 
+                className="max-w-full max-h-48 rounded border border-governance-700 mt-2" 
+              />
+            )}
           </div>
         )}
       </div>
