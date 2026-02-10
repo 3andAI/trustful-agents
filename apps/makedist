@@ -1,1 +1,1 @@
-zip -r dist.zip governance-dashboard/dist/ governance-api/dist/ governance-api/.env governance-api/package.json provider-dashboard/dist/ council-dashboard/dist/ claimer-dashboard/dist claimer-dashboard/.env council-dashboard/.env
+zip -r dist.zip governance-dashboard/dist/ governance-api/dist/ governance-api/.env.local governance-api/package.json  provider-dashboard/dist/ council-dashboard/dist/ claimer-dashboard/dist 

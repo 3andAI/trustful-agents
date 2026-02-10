@@ -1,126 +1,16 @@
 import { Router } from 'express';
-import { createPublicClient, http } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
 import { requireAuth, requireSafeOwner } from '../middleware/auth.js';
 import { validateBody, validateParams, addMemberSchema, updateMemberSchema, councilIdParamSchema, memberAddressParamSchema, } from '../middleware/validation.js';
 import { getCouncilMember, getCouncilMembers, createCouncilMember, updateCouncilMember, deleteCouncilMember, logAuditEvent, } from '../services/members.js';
 import { getAllAgents } from '../services/agents.js';
 import { queueEmail } from '../services/email.js';
+import { COUNCIL_REGISTRY_ADDRESS, TERMS_REGISTRY_ADDRESS, CONTRACTS, CouncilRegistryAbi as CouncilRegistryABI, TermsRegistryAbi as TermsRegistryABI, ERC8004RegistryAbi as ERC8004ABI, publicClient, } from '../config/index.js';
 const router = Router();
 // ============================================================================
-// Configuration
-// ============================================================================
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS;
-// Simplified ABI for read operations
-const CouncilRegistryABI = [
-    {
-        type: 'function',
-        name: 'getCouncil',
-        inputs: [{ name: 'councilId', type: 'bytes32' }],
-        outputs: [
-            {
-                name: 'council',
-                type: 'tuple',
-                components: [
-                    { name: 'councilId', type: 'bytes32' },
-                    { name: 'name', type: 'string' },
-                    { name: 'description', type: 'string' },
-                    { name: 'vertical', type: 'string' },
-                    { name: 'memberCount', type: 'uint256' },
-                    { name: 'quorumPercentage', type: 'uint256' },
-                    { name: 'claimDepositPercentage', type: 'uint256' },
-                    { name: 'votingPeriod', type: 'uint256' },
-                    { name: 'evidencePeriod', type: 'uint256' },
-                    { name: 'active', type: 'bool' },
-                    { name: 'createdAt', type: 'uint256' },
-                    { name: 'closedAt', type: 'uint256' },
-                ],
-            },
-        ],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'getActiveCouncils',
-        inputs: [],
-        outputs: [{ name: 'councilIds', type: 'bytes32[]' }],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'getCouncilMembers',
-        inputs: [{ name: 'councilId', type: 'bytes32' }],
-        outputs: [{ name: 'members', type: 'address[]' }],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'getMember',
-        inputs: [
-            { name: 'councilId', type: 'bytes32' },
-            { name: 'member', type: 'address' },
-        ],
-        outputs: [
-            {
-                name: 'memberInfo',
-                type: 'tuple',
-                components: [
-                    { name: 'member', type: 'address' },
-                    { name: 'councilId', type: 'bytes32' },
-                    { name: 'joinedAt', type: 'uint256' },
-                    { name: 'claimsVoted', type: 'uint256' },
-                    { name: 'active', type: 'bool' },
-                ],
-            },
-        ],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'isActiveMember',
-        inputs: [
-            { name: 'councilId', type: 'bytes32' },
-            { name: 'member', type: 'address' },
-        ],
-        outputs: [{ name: 'isMember', type: 'bool' }],
-        stateMutability: 'view',
-    },
-];
-// TermsRegistry ABI for getting agent terms
-const TermsRegistryABI = [
-    {
-        type: 'function',
-        name: 'getActiveTerms',
-        inputs: [{ name: 'agentId', type: 'uint256' }],
-        outputs: [
-            {
-                name: 'terms',
-                type: 'tuple',
-                components: [
-                    { name: 'contentHash', type: 'bytes32' },
-                    { name: 'contentUri', type: 'string' },
-                    { name: 'councilId', type: 'bytes32' },
-                    { name: 'registeredAt', type: 'uint256' },
-                    { name: 'active', type: 'bool' },
-                ],
-            },
-            { name: 'version', type: 'uint256' },
-        ],
-        stateMutability: 'view',
-    },
-];
-const TERMS_REGISTRY_ADDRESS = process.env.TERMS_REGISTRY_ADDRESS || '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d';
-// ============================================================================
-// Viem Client
+// Viem Client (alias for central config)
 // ============================================================================
 function getClient() {
-    const chain = CHAIN_ID === 8453 ? base : baseSepolia;
-    return createPublicClient({
-        chain,
-        transport: http(RPC_URL),
-    });
+    return publicClient;
 }
 // ============================================================================
 // Routes
@@ -262,27 +152,11 @@ router.get('/:id/agents', validateParams(councilIdParamSchema), async (req, res)
         const client = getClient();
         console.log(`Fetching agents for council ${councilId}`);
         // Get total supply of agents from ERC8004Registry
-        const ERC8004_REGISTRY = process.env.ERC8004_REGISTRY_ADDRESS || '0x454909C7551158e12a6a5192dEB359dDF067ec80';
-        const ERC8004ABI = [
-            {
-                type: 'function',
-                name: 'totalSupply',
-                inputs: [],
-                outputs: [{ name: '', type: 'uint256' }],
-                stateMutability: 'view',
-            },
-            {
-                type: 'function',
-                name: 'ownerOf',
-                inputs: [{ name: 'tokenId', type: 'uint256' }],
-                outputs: [{ name: '', type: 'address' }],
-                stateMutability: 'view',
-            },
-        ];
+        const ERC8004_REGISTRY = CONTRACTS.erc8004Registry;
         const totalSupply = await client.readContract({
             address: ERC8004_REGISTRY,
             abi: ERC8004ABI,
-            functionName: 'totalSupply',
+            functionName: 'nextTokenId',
         });
         console.log(`Total agents: ${totalSupply}`);
         // Get DB metadata for all agents (for names)

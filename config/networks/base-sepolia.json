@@ -1,0 +1,44 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "rpcUrl": "https://sepolia.base.org",
+  "blockExplorerUrl": "https://sepolia.basescan.org",
+  "startBlock": 36873479,
+
+  "contracts": {
+    "usdc": "0xd6897C4801c639Ff4eAaA31D7A5b4802613DB681",
+    "erc8004Registry": "0x454909C7551158e12a6a5192dEB359dDF067ec80",
+    "collateralVault": "0xC948389425061c2C960c034c1c9526E9E6f39ff9",
+    "termsRegistry": "0xBDc5328D4442A1e893CD2b1F75d3F64a3e50f923",
+    "councilRegistry": "0xAaA608c80168D90d77Ec5a7f72Fb939E7Add5C32",
+    "trustfulValidator": "0x9628C1bD875C3378B14f0108b60B0b5739fE92E8",
+    "claimsManager": "0x7B0465DF41c3649f88A627cF06941469BE9C7a44",
+    "rulingExecutor": "0x2a49b1826810AefAfFf93eC9317A426BbF8DC11f"
+  },
+
+  "safe": {
+    "address": "0x568A391C188e2aF11FA7550ACca170e085B00e7F",
+    "txServiceUrl": "https://safe-transaction-base-sepolia.safe.global",
+    "appUrl": "https://app.safe.global",
+    "networkPrefix": "basesep"
+  },
+
+  "services": {
+    "apiUrl": "https://api.trustful-agents.ai",
+    "subgraphUrl": "https://api.studio.thegraph.com/query/1723244/trustful-agents/v1.3.1",
+    "subgraphVersion": "v1.3.1",
+    "ipfsGateway": "https://gateway.pinata.cloud/ipfs"
+  },
+
+  "database": {
+    "name": "trustful_governance_sepolia",
+    "port": 5432
+  },
+
+  "dashboardUrls": {
+    "provider": "https://provider.trustful-agents.ai",
+    "claimer": "https://claims.trustful-agents.ai",
+    "council": "https://council.trustful-agents.ai",
+    "governance": "https://governance.trustful-agents.ai"
+  }
+}

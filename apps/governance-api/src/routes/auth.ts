@@ -22,8 +22,7 @@ const router = Router();
 // Configuration
 // ============================================================================
 
-const DOMAIN = process.env.DOMAIN || 'localhost';
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
+import { CHAIN_ID, DOMAIN } from '../config/index.js';
 
 // ============================================================================
 // Routes

@@ -1,83 +1,20 @@
 import { Router } from 'express';
-import { createPublicClient, http, encodeFunctionData } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { encodeFunctionData } from 'viem';
 import { requireAuth, requireSafeOwner } from '../middleware/auth.js';
 import { validateBody, validateParams, reassignAgentSchema, agentIdParamSchema, } from '../middleware/validation.js';
 import { logAuditEvent } from '../services/members.js';
 import { notifyAllSigners } from '../services/email.js';
 import { getSafeInfo } from '../services/safe.js';
+import { COUNCIL_REGISTRY_ADDRESS, CLAIMS_MANAGER_ADDRESS, CouncilRegistryAbi, ClaimsManagerAbi, publicClient, } from '../config/index.js';
 const router = Router();
-// ============================================================================
-// Configuration
-// ============================================================================
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS;
-const CLAIMS_MANAGER_ADDRESS = process.env.CLAIMS_MANAGER_ADDRESS;
-// ABIs
-const CouncilRegistryABI = [
-    {
-        type: 'function',
-        name: 'getAgentCouncil',
-        inputs: [{ name: 'agentId', type: 'uint256' }],
-        outputs: [{ name: 'councilId', type: 'bytes32' }],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'getCouncil',
-        inputs: [{ name: 'councilId', type: 'bytes32' }],
-        outputs: [
-            {
-                name: 'council',
-                type: 'tuple',
-                components: [
-                    { name: 'councilId', type: 'bytes32' },
-                    { name: 'name', type: 'string' },
-                    { name: 'description', type: 'string' },
-                    { name: 'vertical', type: 'string' },
-                    { name: 'memberCount', type: 'uint256' },
-                    { name: 'quorumPercentage', type: 'uint256' },
-                    { name: 'claimDepositPercentage', type: 'uint256' },
-                    { name: 'votingPeriod', type: 'uint256' },
-                    { name: 'evidencePeriod', type: 'uint256' },
-                    { name: 'active', type: 'bool' },
-                    { name: 'createdAt', type: 'uint256' },
-                    { name: 'closedAt', type: 'uint256' },
-                ],
-            },
-        ],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'reassignAgentCouncil',
-        inputs: [
-            { name: 'agentId', type: 'uint256' },
-            { name: 'newCouncilId', type: 'bytes32' },
-        ],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-];
-const ClaimsManagerABI = [
-    {
-        type: 'function',
-        name: 'getPendingClaimCount',
-        inputs: [{ name: 'agentId', type: 'uint256' }],
-        outputs: [{ name: 'count', type: 'uint256' }],
-        stateMutability: 'view',
-    },
-];
+// Local aliases for the canonical ABIs
+const CouncilRegistryABI = CouncilRegistryAbi;
+const ClaimsManagerABI = ClaimsManagerAbi;
 // ============================================================================
 // Viem Client
 // ============================================================================
 function getClient() {
-    const chain = CHAIN_ID === 8453 ? base : baseSepolia;
-    return createPublicClient({
-        chain,
-        transport: http(RPC_URL),
-    });
+    return publicClient;
 }
 // ============================================================================
 // Routes

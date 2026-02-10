@@ -3,4 +3,5 @@ export { default as councilRoutes } from './councils.js';
 export { default as safeRoutes } from './safe.js';
 export { default as agentRoutes } from './agents.js';
 export { default as proposalRoutes } from './proposals.js';
+export { default as ipfsRoutes } from './ipfs.js';
 //# sourceMappingURL=index.d.ts.map

@@ -1,0 +1,216 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  # ---------------------------------------------------------------------------
+  # CollateralVault
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: CollateralVault
+    network: {{NETWORK}}
+    source:
+      address: "{{COLLATERAL_VAULT}}"
+      abi: CollateralVault
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - Deposit
+        - Withdrawal
+        - ProtocolStats
+      abis:
+        - name: CollateralVault
+          file: ./abis/CollateralVault.json
+      eventHandlers:
+        - event: Deposited(indexed uint256,indexed address,uint256)
+          handler: handleDeposited
+        - event: WithdrawalInitiated(indexed uint256,uint256,uint256)
+          handler: handleWithdrawalInitiated
+        - event: WithdrawalCancelled(indexed uint256)
+          handler: handleWithdrawalCancelled
+        - event: WithdrawalExecuted(indexed uint256,indexed address,uint256)
+          handler: handleWithdrawalExecuted
+        - event: CollateralLocked(indexed uint256,uint256,uint256)
+          handler: handleCollateralLocked
+        - event: CollateralUnlocked(indexed uint256,uint256,uint256)
+          handler: handleCollateralUnlocked
+        - event: CollateralSlashed(indexed uint256,uint256,indexed address,uint256)
+          handler: handleCollateralSlashed
+      file: ./src/mappings/collateral-vault.ts
+
+  # ---------------------------------------------------------------------------
+  # TermsRegistry
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: TermsRegistry
+    network: {{NETWORK}}
+    source:
+      address: "{{TERMS_REGISTRY}}"
+      abi: TermsRegistry
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - TermsVersion
+      abis:
+        - name: TermsRegistry
+          file: ./abis/TermsRegistry.json
+      eventHandlers:
+        - event: TermsRegistered(indexed uint256,indexed uint256,bytes32,string,bytes32)
+          handler: handleTermsRegistered
+        - event: TermsActivated(indexed uint256,indexed uint256)
+          handler: handleTermsActivated
+        - event: TermsDeactivated(indexed uint256,indexed uint256)
+          handler: handleTermsDeactivated
+      file: ./src/mappings/terms-registry.ts
+
+  # ---------------------------------------------------------------------------
+  # TrustfulValidator
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: TrustfulValidator
+    network: {{NETWORK}}
+    source:
+      address: "{{TRUSTFUL_VALIDATOR}}"
+      abi: TrustfulValidator
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - ValidationEvent
+        - ProtocolStats
+      abis:
+        - name: TrustfulValidator
+          file: ./abis/TrustfulValidator.json
+      eventHandlers:
+        - event: ValidationIssued(indexed uint256,indexed bytes32,uint256,string)
+          handler: handleValidationIssued
+        - event: ValidationRevoked(indexed uint256,indexed bytes32,uint8)
+          handler: handleValidationRevoked
+      file: ./src/mappings/trustful-validator.ts
+
+  # ---------------------------------------------------------------------------
+  # CouncilRegistry
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: CouncilRegistry
+    network: {{NETWORK}}
+    source:
+      address: "{{COUNCIL_REGISTRY}}"
+      abi: CouncilRegistry
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Council
+        - CouncilMember
+        - ProtocolStats
+      abis:
+        - name: CouncilRegistry
+          file: ./abis/CouncilRegistry.json
+      eventHandlers:
+        - event: CouncilCreated(indexed bytes32,string,string,uint256,uint256)
+          handler: handleCouncilCreated
+        - event: CouncilUpdated(indexed bytes32)
+          handler: handleCouncilUpdated
+        - event: CouncilDeactivated(indexed bytes32)
+          handler: handleCouncilDeactivated
+        - event: CouncilActivated(indexed bytes32)
+          handler: handleCouncilActivated
+        - event: CouncilClosed(indexed bytes32,uint256)
+          handler: handleCouncilClosed
+        - event: MemberAdded(indexed bytes32,indexed address)
+          handler: handleMemberAdded
+        - event: MemberRemoved(indexed bytes32,indexed address)
+          handler: handleMemberRemoved
+      file: ./src/mappings/council-registry.ts
+
+  # ---------------------------------------------------------------------------
+  # ClaimsManager
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: ClaimsManager
+    network: {{NETWORK}}
+    source:
+      address: "{{CLAIMS_MANAGER}}"
+      abi: ClaimsManager
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - Claim
+        - Evidence
+        - Vote
+        - Council
+        - CouncilMember
+        - ProtocolStats
+      abis:
+        - name: ClaimsManager
+          file: ./abis/ClaimsManager.json
+      eventHandlers:
+        - event: ClaimFiled(indexed uint256,indexed uint256,indexed address,uint256,uint256,bytes32)
+          handler: handleClaimFiled
+        - event: EvidenceSubmitted(indexed uint256,bytes32,string,bool)
+          handler: handleEvidenceSubmitted
+        - event: VoteCast(indexed uint256,indexed address,uint8,uint256)
+          handler: handleVoteCast
+        - event: VoteChanged(indexed uint256,indexed address,uint8,uint8,uint256,uint256)
+          handler: handleVoteChanged
+        - event: ClaimApproved(indexed uint256,uint256)
+          handler: handleClaimApproved
+        - event: ClaimRejected(indexed uint256)
+          handler: handleClaimRejected
+        - event: ClaimCancelled(indexed uint256,uint256)
+          handler: handleClaimCancelled
+        - event: ClaimExpired(indexed uint256,bool)
+          handler: handleClaimExpired
+        - event: ClaimExecuted(indexed uint256,uint256)
+          handler: handleClaimExecuted
+      file: ./src/mappings/claims-manager.ts
+
+  # ---------------------------------------------------------------------------
+  # RulingExecutor
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: RulingExecutor
+    network: {{NETWORK}}
+    source:
+      address: "{{RULING_EXECUTOR}}"
+      abi: RulingExecutor
+      startBlock: {{START_BLOCK}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Claim
+        - Agent
+        - Council
+        - ProtocolStats
+      abis:
+        - name: RulingExecutor
+          file: ./abis/RulingExecutor.json
+      eventHandlers:
+        - event: ClaimExecuted(indexed uint256,indexed uint256,indexed address,uint256,uint256)
+          handler: handleRulingExecuted
+        - event: DepositDistributed(indexed uint256,uint256,uint256,uint256)
+          handler: handleDepositDistributed
+        - event: DepositReturned(indexed uint256,indexed address,uint256,string)
+          handler: handleDepositReturned
+        - event: CollateralUnlocked(indexed uint256,indexed uint256,uint256)
+          handler: handleCollateralUnlockedByExecutor
+      file: ./src/mappings/ruling-executor.ts

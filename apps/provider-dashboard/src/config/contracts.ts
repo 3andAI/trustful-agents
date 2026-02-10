@@ -1,439 +1,50 @@
-import { type Address } from 'viem'
-
 // =============================================================================
-// Chain Configuration
-// =============================================================================
-
-export const CHAIN_ID = 84532 // Base Sepolia
-export const BLOCK_EXPLORER_URL = 'https://sepolia.basescan.org'
-
-// =============================================================================
-// Contract Addresses - Base Sepolia
+// Provider Dashboard Contract Configuration
+// Re-exports from centralized config with dashboard-specific additions
 // =============================================================================
 
-export const CONTRACTS = {
-  usdc: '0xd6897C4801c639Ff4eAaA31D7A5b4802613DB681' as Address,
-  erc8004Registry: '0x454909C7551158e12a6a5192dEB359dDF067ec80' as Address,
-  collateralVault: '0xC948389425061c2C960c034c1c9526E9E6f39ff9' as Address,
-  termsRegistry: '0xBDc5328D4442A1e893CD2b1F75d3F64a3e50f923' as Address,
-  councilRegistry: '0xAaA608c80168D90d77Ec5a7f72Fb939E7Add5C32' as Address,
-  trustfulValidator: '0x9628C1bD875C3378B14f0108b60B0b5739fE92E8' as Address,
-  claimsManager: '0x7B0465DF41c3649f88A627cF06941469BE9C7a44' as Address,
-} as const
+// Re-export everything from centralized config
+export {
+  // Network
+  CHAIN_ID,
+  BLOCK_EXPLORER_URL,
+  RPC_URL,
+  
+  // Contracts
+  CONTRACTS,
+  
+  // Service URLs
+  API_URL,
+  SUBGRAPH_URL,
+  IPFS_GATEWAY,
+  
+  // Constants
+  USDC_DECIMALS,
+  
+  // ABIs - both naming conventions for compatibility
+  USDCAbi,
+  USDCAbi as MockUsdcAbi,
+  ERC8004RegistryAbi,
+  ERC8004RegistryAbi as Erc8004RegistryAbi,
+  ERC8004RegistryAbi as MockErc8004RegistryAbi,
+  CollateralVaultAbi,
+  TermsRegistryAbi,
+  TrustfulValidatorAbi,
+  CouncilRegistryAbi,
+  ClaimsManagerAbi,
+} from '../../../../config/generated/contracts';
 
-// =============================================================================
-// Constants
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Dashboard-specific constants
+// ---------------------------------------------------------------------------
 
-export const USDC_DECIMALS = 6
-export const GRACE_PERIOD_DAYS = 7
-export const GRACE_PERIOD_SECONDS = GRACE_PERIOD_DAYS * 24 * 60 * 60
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.trustful-agents.ai'
+export const GRACE_PERIOD_DAYS = 7;
+export const GRACE_PERIOD_SECONDS = GRACE_PERIOD_DAYS * 24 * 60 * 60;
+
+// Alias for backward compatibility
+import { API_URL } from '../../../../config/generated/contracts';
+export const API_BASE_URL = API_URL;
 
 // Check if contracts are configured
-export const isConfigured = CONTRACTS.usdc !== '0x0000000000000000000000000000000000000000'
-
-// =============================================================================
-// ABIs
-// =============================================================================
-
-export const MockUsdcAbi = [
-  {
-    type: 'function',
-    name: 'mint',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'approve',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'allowance',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'decimals',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint8' }],
-    stateMutability: 'view',
-  },
-] as const
-
-export const Erc8004RegistryAbi = [
-  {
-    type: 'function',
-    name: 'mint',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'tokenId', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'mintAuto',
-    inputs: [{ name: 'to', type: 'address' }],
-    outputs: [{ name: 'tokenId', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'ownerOf',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'nextTokenId',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  // ERC721Enumerable
-  {
-    type: 'function',
-    name: 'tokenOfOwnerByIndex',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'index', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const
-
-// Backwards compatibility alias
-export const MockErc8004RegistryAbi = Erc8004RegistryAbi
-
-export const CollateralVaultAbi = [
-  {
-    type: 'function',
-    name: 'deposit',
-    inputs: [
-      { name: 'agentId', type: 'uint256' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'initiateWithdrawal',
-    inputs: [
-      { name: 'agentId', type: 'uint256' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'executeWithdrawal',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelWithdrawal',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'getAccount',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'account',
-        type: 'tuple',
-        components: [
-          { name: 'balance', type: 'uint256' },
-          { name: 'lockedAmount', type: 'uint256' },
-          { name: 'withdrawalInitiatedAt', type: 'uint256' },
-          { name: 'withdrawalAmount', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getAvailableBalance',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: 'available', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'gracePeriod',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const
-
-export const TermsRegistryAbi = [
-  {
-    type: 'function',
-    name: 'registerTerms',
-    inputs: [
-      { name: 'agentId', type: 'uint256' },
-      { name: 'contentHash', type: 'bytes32' },
-      { name: 'contentUri', type: 'string' },
-      { name: 'councilId', type: 'bytes32' },
-    ],
-    outputs: [{ name: 'version', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'getActiveTerms',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'terms',
-        type: 'tuple',
-        components: [
-          { name: 'contentHash', type: 'bytes32' },
-          { name: 'contentUri', type: 'string' },
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'registeredAt', type: 'uint256' },
-          { name: 'active', type: 'bool' },
-        ],
-      },
-      { name: 'version', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'hasActiveTerms',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getTermsHistory',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'versions',
-        type: 'tuple[]',
-        components: [
-          { name: 'contentHash', type: 'bytes32' },
-          { name: 'contentUri', type: 'string' },
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'registeredAt', type: 'uint256' },
-          { name: 'active', type: 'bool' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getTermsConfig',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'config',
-        type: 'tuple',
-        components: [
-          { name: 'activeVersion', type: 'uint256' },
-          { name: 'versionCount', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-] as const
-
-export const TrustfulValidatorAbi = [
-  {
-    type: 'function',
-    name: 'requestValidation',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: 'requestHash', type: 'bytes32' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'isValidated',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: 'isValid', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'checkConditions',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'conditions',
-        type: 'tuple',
-        components: [
-          { name: 'hasMinimumCollateral', type: 'bool' },
-          { name: 'hasActiveTerms', type: 'bool' },
-          { name: 'isOwnerValid', type: 'bool' },
-          { name: 'councilIsActive', type: 'bool' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getValidationRecord',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'record',
-        type: 'tuple',
-        components: [
-          { name: 'requestHash', type: 'bytes32' },
-          { name: 'issuedAt', type: 'uint256' },
-          { name: 'revokedAt', type: 'uint256' },
-          { name: 'nonce', type: 'uint256' },
-          { name: 'revocationReason', type: 'uint8' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'minimumCollateral',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const
-
-export const CouncilRegistryAbi = [
-  {
-    type: 'function',
-    name: 'getCouncil',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [
-      {
-        name: 'council',
-        type: 'tuple',
-        components: [
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'name', type: 'string' },
-          { name: 'description', type: 'string' },
-          { name: 'vertical', type: 'string' },
-          { name: 'memberCount', type: 'uint256' },
-          { name: 'quorumPercentage', type: 'uint256' },
-          { name: 'claimDepositPercentage', type: 'uint256' },
-          { name: 'votingPeriod', type: 'uint256' },
-          { name: 'evidencePeriod', type: 'uint256' },
-          { name: 'active', type: 'bool' },
-          { name: 'createdAt', type: 'uint256' },
-          { name: 'closedAt', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getActiveCouncils',
-    inputs: [],
-    outputs: [{ name: 'councilIds', type: 'bytes32[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isCouncilActive',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [{ name: 'isActive', type: 'bool' }],
-    stateMutability: 'view',
-  },
-] as const
-
-export const ClaimsManagerAbi = [
-  {
-    type: 'function',
-    name: 'getClaim',
-    inputs: [{ name: 'claimId', type: 'uint256' }],
-    outputs: [
-      {
-        name: 'claim',
-        type: 'tuple',
-        components: [
-          { name: 'agentId', type: 'uint256' },
-          { name: 'claimant', type: 'address' },
-          { name: 'claimedAmount', type: 'uint256' },
-          { name: 'approvedAmount', type: 'uint256' },
-          { name: 'claimantDeposit', type: 'uint256' },
-          { name: 'lockedCollateral', type: 'uint256' },
-          { name: 'evidenceHash', type: 'bytes32' },
-          { name: 'evidenceUri', type: 'string' },
-          { name: 'paymentReceiptHash', type: 'bytes32' },
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'providerAtClaimTime', type: 'address' },
-          { name: 'status', type: 'uint8' },
-          { name: 'filedAt', type: 'uint256' },
-          { name: 'evidenceDeadline', type: 'uint256' },
-          { name: 'votingDeadline', type: 'uint256' },
-          { name: 'votesFor', type: 'uint256' },
-          { name: 'votesAgainst', type: 'uint256' },
-          { name: 'votesAbstain', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getClaimsByAgent',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: 'claimIds', type: 'uint256[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getClaimCount',
-    inputs: [],
-    outputs: [{ name: 'count', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const
+import { CONTRACTS } from '../../../../config/generated/contracts';
+export const isConfigured = CONTRACTS.usdc !== '0x0000000000000000000000000000000000000000';

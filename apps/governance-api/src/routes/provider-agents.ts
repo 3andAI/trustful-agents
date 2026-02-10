@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { createPublicClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
 import { z } from 'zod';
 import {
   getAgentMetadata,
@@ -10,33 +8,14 @@ import {
   updateAgentMetadata,
   agentMetadataExists,
 } from '../services/agents.js';
+import {
+  CONTRACTS,
+  RPC_URL,
+  publicClient,
+  ERC8004RegistryAbi,
+} from '../config/index.js';
 
 const router = Router();
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-
-const CONTRACTS = {
-  erc8004Registry: '0x454909C7551158e12a6a5192dEB359dDF067ec80',
-} as const;
-
-const Erc8004RegistryAbi = [
-  {
-    type: 'function',
-    name: 'ownerOf',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view',
-  },
-] as const;
-
-const client = createPublicClient({
-  chain: baseSepolia,
-  transport: http(RPC_URL),
-});
 
 // ============================================================================
 // Validation Schemas
@@ -68,9 +47,9 @@ async function verifyOwnership(agentId: string, claimedOwner: string, retries = 
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const owner = await client.readContract({
+      const owner = await publicClient.readContract({
         address: CONTRACTS.erc8004Registry,
-        abi: Erc8004RegistryAbi,
+        abi: ERC8004RegistryAbi,
         functionName: 'ownerOf',
         args: [BigInt(agentId)],
       });

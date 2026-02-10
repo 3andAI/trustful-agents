@@ -7,7 +7,7 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { chain } from '../config/contracts';
 import { useWallet } from './useWallet';
 import { getSafeInfo, storePendingTransaction } from '../lib/api';
 
@@ -96,12 +96,12 @@ export function useSafeTransaction() {
       try {
         // Create viem clients
         const publicClient = createPublicClient({
-          chain: baseSepolia,
+          chain: chain,
           transport: http(),
         });
 
         const walletClient = createWalletClient({
-          chain: baseSepolia,
+          chain: chain,
           transport: custom(window.ethereum),
           account: address as Address,
         });

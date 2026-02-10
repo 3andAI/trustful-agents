@@ -77,14 +77,14 @@ export declare const proposeTransactionSchema: z.ZodObject<{
     value: z.ZodDefault<z.ZodString>;
     description: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    description: string;
     to: string;
+    data: string;
     value: string;
-    data: string;
-    description: string;
 }, {
+    description: string;
     to: string;
     data: string;
-    description: string;
     value?: string | undefined;
 }>;
 export declare const councilIdParamSchema: z.ZodObject<{

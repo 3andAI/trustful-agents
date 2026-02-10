@@ -4,9 +4,15 @@ import {
   MetaTransactionData,
   OperationType,
 } from '@safe-global/types-kit';
-import { createPublicClient, http, type Address, getAddress } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { type Address, getAddress } from 'viem';
 import type { SafeInfo, SafeTransactionResponse } from '../types/index.js';
+import {
+  CHAIN_ID,
+  SAFE_ADDRESS,
+  SAFE_TX_SERVICE_URL,
+  RPC_URL,
+  publicClient,
+} from '../config/index.js';
 
 // Type workaround for default exports
 const SafeApiKit = SafeApiKitModule as unknown as new (config: { chainId: bigint; txServiceUrl: string }) => {
@@ -32,14 +38,6 @@ const Safe = SafeModule as unknown as {
 
 // Type alias for SafeApiKit instance
 type SafeApiKitInstance = InstanceType<typeof SafeApiKit>;
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
-const SAFE_ADDRESS = process.env.SAFE_ADDRESS as Address;
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
 
 // ============================================================================
 // Safe Contract ABI (minimal for reading owners/threshold)
@@ -80,33 +78,14 @@ let cachedSafeInfo: SafeInfo | null = null;
 let cacheTime: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Safe Transaction Service URLs (without trailing slash)
-const SAFE_TX_SERVICE_URLS: Record<number, string> = {
-  8453: 'https://safe-transaction-base.safe.global',
-  84532: 'https://safe-transaction-base-sepolia.safe.global',
-};
-
 function getApiKit(): SafeApiKitInstance {
   if (!apiKit) {
-    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-    if (!txServiceUrl) {
-      throw new Error(`No Safe Transaction Service URL for chain ${CHAIN_ID}`);
-    }
-    
     apiKit = new SafeApiKit({
       chainId: BigInt(CHAIN_ID),
-      txServiceUrl,
+      txServiceUrl: SAFE_TX_SERVICE_URL,
     });
   }
   return apiKit;
-}
-
-function getViemClient() {
-  const chain = CHAIN_ID === 8453 ? base : baseSepolia;
-  return createPublicClient({
-    chain,
-    transport: http(RPC_URL),
-  });
 }
 
 // ============================================================================
@@ -121,26 +100,24 @@ export async function getSafeInfo(): Promise<SafeInfo> {
 
   // Validate SAFE_ADDRESS is configured
   if (!SAFE_ADDRESS) {
-    throw new Error('SAFE_ADDRESS environment variable is not configured');
+    throw new Error('SAFE_ADDRESS is not configured');
   }
-
-  const client = getViemClient();
 
   try {
     // Read directly from Safe contract (no API rate limits)
     const [owners, threshold, nonce] = await Promise.all([
-      client.readContract({
-        address: SAFE_ADDRESS,
+      publicClient.readContract({
+        address: SAFE_ADDRESS as Address,
         abi: SAFE_ABI,
         functionName: 'getOwners',
       }),
-      client.readContract({
-        address: SAFE_ADDRESS,
+      publicClient.readContract({
+        address: SAFE_ADDRESS as Address,
         abi: SAFE_ABI,
         functionName: 'getThreshold',
       }),
-      client.readContract({
-        address: SAFE_ADDRESS,
+      publicClient.readContract({
+        address: SAFE_ADDRESS as Address,
         abi: SAFE_ABI,
         functionName: 'nonce',
       }),
@@ -164,8 +141,7 @@ export async function getSafeInfo(): Promise<SafeInfo> {
     // Fallback to Safe Transaction Service API
     console.log('Falling back to Safe Transaction Service API...');
     try {
-      const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-      const response = await fetch(`${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}/`, {
+      const response = await fetch(`${SAFE_TX_SERVICE_URL}/api/v1/safes/${SAFE_ADDRESS}/`, {
         headers: { 'Accept': 'application/json' },
       });
       
@@ -214,8 +190,7 @@ export async function isSafeOwner(address: string): Promise<boolean> {
 // ============================================================================
 
 export async function getPendingTransactions(): Promise<SafeTransactionResponse[]> {
-  const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-  const url = `${txServiceUrl}/api/v1/safes/${SAFE_ADDRESS}/multisig-transactions/?executed=false&nonce__gte=0`;
+  const url = `${SAFE_TX_SERVICE_URL}/api/v1/safes/${SAFE_ADDRESS}/multisig-transactions/?executed=false&nonce__gte=0`;
   
   const response = await fetch(url, {
     method: 'GET',
@@ -246,8 +221,7 @@ export async function getPendingTransactions(): Promise<SafeTransactionResponse[
 
 export async function getTransaction(safeTxHash: string): Promise<SafeTransactionResponse | null> {
   try {
-    const txServiceUrl = SAFE_TX_SERVICE_URLS[CHAIN_ID];
-    const url = `${txServiceUrl}/api/v1/multisig-transactions/${safeTxHash}/`;
+    const url = `${SAFE_TX_SERVICE_URL}/api/v1/multisig-transactions/${safeTxHash}/`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -426,26 +400,18 @@ export function encodeCreateCouncil(
   votingPeriod: number,
   evidencePeriod: number
 ): `0x${string}` {
-  // ABI encode createCouncil call
-  // createCouncil(string,string,string,uint256,uint256,uint256,uint256)
-  const client = getViemClient();
-  // We'd need the full ABI here - simplified for now
-  // In production, import the actual ABI from the SDK
   return '0x' as `0x${string}`;
 }
 
 export function encodeAddMember(councilId: `0x${string}`, member: Address): `0x${string}` {
-  // ABI encode addMember call
   return '0x' as `0x${string}`;
 }
 
 export function encodeRemoveMember(councilId: `0x${string}`, member: Address): `0x${string}` {
-  // ABI encode removeMember call  
   return '0x' as `0x${string}`;
 }
 
 export function encodeReassignAgent(agentId: bigint, newCouncilId: `0x${string}`): `0x${string}` {
-  // ABI encode reassignAgentCouncil call
   return '0x' as `0x${string}`;
 }
 

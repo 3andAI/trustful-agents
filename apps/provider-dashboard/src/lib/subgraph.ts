@@ -1,8 +1,9 @@
 // Subgraph client for Trustful Agents
-// Endpoint: https://api.studio.thegraph.com/query/1723244/trustful-agents/v0.1
 
-const SUBGRAPH_URL = import.meta.env.VITE_SUBGRAPH_URL || 
-  'https://api.studio.thegraph.com/query/1723244/trustful-agents/v1.3.1'
+import { SUBGRAPH_URL as CONFIG_SUBGRAPH_URL } from '../config/contracts';
+
+const SUBGRAPH_URL = import.meta.env.VITE_SUBGRAPH_URL || CONFIG_SUBGRAPH_URL;
+
 
 // =============================================================================
 // Types

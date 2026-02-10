@@ -1,156 +1,14 @@
-import { createPublicClient, http, type Address, type Hex } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { type Address, type Hex } from 'viem';
+import {
+  CHAIN_ID,
+  RPC_URL,
+  COUNCIL_REGISTRY_ADDRESS,
+  CouncilRegistryAbi,
+  publicClient,
+} from '../config/index.js';
 
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS as Address;
-
-// ============================================================================
-// Client
-// ============================================================================
-
-const chain = CHAIN_ID === 8453 ? base : baseSepolia;
-
-export const publicClient = createPublicClient({
-  chain,
-  transport: http(RPC_URL),
-});
-
-// ============================================================================
-// CouncilRegistry ABI (read functions only)
-// ============================================================================
-
-const councilRegistryABI = [
-  {
-    type: 'function',
-    name: 'getCouncil',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [{
-      type: 'tuple',
-      components: [
-        { name: 'councilId', type: 'bytes32' },
-        { name: 'name', type: 'string' },
-        { name: 'description', type: 'string' },
-        { name: 'vertical', type: 'string' },
-        { name: 'memberCount', type: 'uint256' },
-        { name: 'quorumPercentage', type: 'uint256' },
-        { name: 'claimDepositPercentage', type: 'uint256' },
-        { name: 'votingPeriod', type: 'uint256' },
-        { name: 'evidencePeriod', type: 'uint256' },
-        { name: 'active', type: 'bool' },
-        { name: 'createdAt', type: 'uint256' },
-        { name: 'closedAt', type: 'uint256' },
-      ],
-    }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getActiveCouncils',
-    inputs: [],
-    outputs: [{ name: 'councilIds', type: 'bytes32[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getCouncilMembers',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [{ name: 'members', type: 'address[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getMember',
-    inputs: [
-      { name: 'councilId', type: 'bytes32' },
-      { name: 'member', type: 'address' },
-    ],
-    outputs: [{
-      type: 'tuple',
-      components: [
-        { name: 'member', type: 'address' },
-        { name: 'councilId', type: 'bytes32' },
-        { name: 'joinedAt', type: 'uint256' },
-        { name: 'claimsVoted', type: 'uint256' },
-        { name: 'active', type: 'bool' },
-      ],
-    }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'councilStatus',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [
-      { name: 'exists', type: 'bool' },
-      { name: 'active', type: 'bool' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isCouncilClosed',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [{ name: 'isClosed', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'canCloseCouncil',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [
-      { name: 'canClose', type: 'bool' },
-      { name: 'reason', type: 'string' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getCouncilsByVertical',
-    inputs: [{ name: 'vertical', type: 'string' }],
-    outputs: [{ name: 'councilIds', type: 'bytes32[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'event',
-    name: 'CouncilCreated',
-    inputs: [
-      { name: 'councilId', type: 'bytes32', indexed: true },
-      { name: 'name', type: 'string', indexed: false },
-      { name: 'vertical', type: 'string', indexed: false },
-      { name: 'quorumPercentage', type: 'uint256', indexed: false },
-      { name: 'claimDepositPercentage', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'CouncilClosed',
-    inputs: [
-      { name: 'councilId', type: 'bytes32', indexed: true },
-      { name: 'timestamp', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MemberAdded',
-    inputs: [
-      { name: 'councilId', type: 'bytes32', indexed: true },
-      { name: 'member', type: 'address', indexed: true },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MemberRemoved',
-    inputs: [
-      { name: 'councilId', type: 'bytes32', indexed: true },
-      { name: 'member', type: 'address', indexed: true },
-    ],
-  },
-] as const;
+// Re-export publicClient for consumers that import from here
+export { publicClient };
 
 // ============================================================================
 // Types
@@ -191,8 +49,8 @@ export async function getActiveCouncilIds(): Promise<Hex[]> {
 
   try {
     const councilIds = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'getActiveCouncils',
     });
     return councilIds as Hex[];
@@ -210,8 +68,8 @@ export async function getCouncil(councilId: Hex): Promise<OnChainCouncil | null>
 
   try {
     const council = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'getCouncil',
       args: [councilId],
     });
@@ -244,8 +102,8 @@ export async function getCouncilMembers(councilId: Hex): Promise<Address[]> {
 
   try {
     const members = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'getCouncilMembers',
       args: [councilId],
     });
@@ -264,8 +122,8 @@ export async function getMember(councilId: Hex, memberAddress: Address): Promise
 
   try {
     const member = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'getMember',
       args: [councilId, memberAddress],
     });
@@ -283,8 +141,8 @@ export async function getCouncilStatus(councilId: Hex): Promise<{ exists: boolea
 
   try {
     const [exists, active] = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'councilStatus',
       args: [councilId],
     });
@@ -302,8 +160,8 @@ export async function canCloseCouncil(councilId: Hex): Promise<{ canClose: boole
 
   try {
     const [canClose, reason] = await publicClient.readContract({
-      address: COUNCIL_REGISTRY_ADDRESS,
-      abi: councilRegistryABI,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
+      abi: CouncilRegistryAbi,
       functionName: 'canCloseCouncil',
       args: [councilId],
     });
@@ -325,7 +183,7 @@ export async function getCouncilCreatedEvents(fromBlock?: bigint) {
 
   try {
     const logs = await publicClient.getLogs({
-      address: COUNCIL_REGISTRY_ADDRESS,
+      address: COUNCIL_REGISTRY_ADDRESS as Address,
       event: {
         type: 'event',
         name: 'CouncilCreated',
@@ -348,7 +206,7 @@ export async function getCouncilCreatedEvents(fromBlock?: bigint) {
 }
 
 // ============================================================================
-// Exports
+// Re-exports for backward compatibility
 // ============================================================================
 
 export { COUNCIL_REGISTRY_ADDRESS, CHAIN_ID, RPC_URL };

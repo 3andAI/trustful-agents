@@ -1,14 +1,18 @@
 import { http, createConfig } from 'wagmi'
-import { baseSepolia } from 'wagmi/chains'
+import { base, baseSepolia } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
+import { CHAIN_ID } from './contracts'
+
+// Select chain based on centralized config
+const chain = CHAIN_ID === 8453 ? base : baseSepolia;
 
 export const config = createConfig({
-  chains: [baseSepolia],
+  chains: [chain],
   connectors: [
     injected(),
   ],
   transports: {
-    [baseSepolia.id]: http(),
+    [chain.id]: http(),
   },
 })
 

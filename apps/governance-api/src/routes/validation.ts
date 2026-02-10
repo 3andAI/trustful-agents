@@ -1,104 +1,19 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { createPublicClient, http, formatUnits } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { formatUnits } from 'viem';
 import { getAgentMetadata } from '../services/agents.js';
+import {
+  CONTRACTS,
+  CHAIN_ID,
+  API_URL,
+  DASHBOARD_URLS,
+  publicClient,
+  TrustfulValidatorAbi,
+  CollateralVaultAbi,
+  TermsRegistryAbi,
+} from '../config/index.js';
 
 const router = Router();
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const CONTRACTS = {
-  trustfulValidator: '0x9628C1bD875C3378B14f0108b60B0b5739fE92E8',
-  collateralVault: '0xC948389425061c2C960c034c1c9526E9E6f39ff9',
-  termsRegistry: '0xBDc5328D4442A1e893CD2b1F75d3F64a3e50f923',
-  councilRegistry: '0xAaA608c80168D90d77Ec5a7f72Fb939E7Add5C32',
-  erc8004Registry: '0x454909C7551158e12a6a5192dEB359dDF067ec80',
-} as const;
-
-// Simple ABIs for the functions we need
-const TrustfulValidatorAbi = [
-  {
-    type: 'function',
-    name: 'isValidated',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getValidationRecord',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        components: [
-          { name: 'requestHash', type: 'bytes32' },
-          { name: 'issuedAt', type: 'uint256' },
-          { name: 'revokedAt', type: 'uint256' },
-          { name: 'nonce', type: 'uint256' },
-          { name: 'revocationReason', type: 'uint8' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-] as const;
-
-const CollateralVaultAbi = [
-  {
-    type: 'function',
-    name: 'getAccount',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        components: [
-          { name: 'balance', type: 'uint256' },
-          { name: 'lockedAmount', type: 'uint256' },
-          { name: 'withdrawalInitiatedAt', type: 'uint256' },
-          { name: 'withdrawalAmount', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-] as const;
-
-const TermsRegistryAbi = [
-  {
-    type: 'function',
-    name: 'getActiveTerms',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        components: [
-          { name: 'contentHash', type: 'bytes32' },
-          { name: 'contentUri', type: 'string' },
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'registeredAt', type: 'uint256' },
-          { name: 'active', type: 'bool' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-] as const;
-
-// RPC URL from environment
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-
-// Create viem client
-const client = createPublicClient({
-  chain: baseSepolia,
-  transport: http(RPC_URL),
-});
 
 // ============================================================================
 // Routes
@@ -117,33 +32,36 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
     console.log(`Using collateral vault: ${CONTRACTS.collateralVault}`);
     
     // Fetch metadata from DB and chain data in parallel
-    const [metadata, isValidated, validation, collateral, terms] = await Promise.all([
+    const [metadata, isValidated, validation, collateral, termsResult] = await Promise.all([
       getAgentMetadata(agentId),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
         functionName: 'isValidated',
         args: [BigInt(agentId)],
       }),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
         functionName: 'getValidationRecord',
         args: [BigInt(agentId)],
       }).catch((err) => { console.log('getValidationRecord error:', err); return null; }),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.collateralVault,
         abi: CollateralVaultAbi,
         functionName: 'getAccount',
         args: [BigInt(agentId)],
       }).catch((err) => { console.log('getAccount error:', err); return null; }),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.termsRegistry,
         abi: TermsRegistryAbi,
         functionName: 'getActiveTerms',
         args: [BigInt(agentId)],
       }).catch((err) => { console.log('getActiveTerms error:', err); return null; }),
     ]);
+
+    // getActiveTerms returns a tuple [termsData, version] — extract the data
+    const terms = termsResult ? termsResult[0] : null;
 
     console.log(`Agent ${agentId} collateral result:`, collateral);
     console.log(`Agent ${agentId} balance:`, collateral ? collateral.balance.toString() : 'null');
@@ -166,10 +84,10 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
       // Standard A2A Agent Card fields
       name: agentName,
       description: agentDescription,
-      image: `https://api.trustful-agents.ai/v1/agents/${agentId}/image.svg`,
+      image: `${API_URL}/v1/agents/${agentId}/image.svg`,
       
       // External URLs
-      external_url: `https://provider.trustful-agents.ai/agents/${agentId}`,
+      external_url: `${DASHBOARD_URLS.provider}/agents/${agentId}`,
       
       // Standard NFT attributes
       attributes: [
@@ -201,7 +119,7 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
         trustful: {
           version: '1.0',
           validatorAddress: CONTRACTS.trustfulValidator,
-          chainId: 84532,
+          chainId: CHAIN_ID,
           collateral: collateral ? {
             amount: formatUnits(collateral.balance, 6),
             asset: 'USDC',
@@ -219,7 +137,7 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
               ? new Date(Number(validation.issuedAt) * 1000).toISOString() 
               : null,
           },
-          verificationUrl: `https://api.trustful-agents.ai/v1/agents/${agentId}/validation.json`,
+          verificationUrl: `${API_URL}/v1/agents/${agentId}/validation.json`,
           // Include website if present
           ...(metadata?.website_url ? { websiteUrl: metadata.website_url } : {}),
         },
@@ -248,13 +166,13 @@ router.get('/agents/:agentId/image.svg', async (req: Request, res: Response) => 
   try {
     const [metadata, isValidated, collateral] = await Promise.all([
       getAgentMetadata(agentId),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
         functionName: 'isValidated',
         args: [BigInt(agentId)],
       }),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.collateralVault,
         abi: CollateralVaultAbi,
         functionName: 'getAccount',
@@ -317,7 +235,7 @@ router.get('/agents/:agentId/validation.json', async (req: Request, res: Respons
   const { agentId } = req.params;
 
   try {
-    const isValidated = await client.readContract({
+    const isValidated = await publicClient.readContract({
       address: CONTRACTS.trustfulValidator,
       abi: TrustfulValidatorAbi,
       functionName: 'isValidated',
@@ -331,7 +249,7 @@ router.get('/agents/:agentId/validation.json', async (req: Request, res: Respons
       agentId,
       isValidated,
       validatorAddress: CONTRACTS.trustfulValidator,
-      chainId: 84532,
+      chainId: CHAIN_ID,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -352,32 +270,35 @@ router.get('/agents/:agentId/trust-info.json', async (req: Request, res: Respons
 
   try {
     // Fetch all data in parallel
-    const [isValidated, validation, collateral, terms] = await Promise.all([
-      client.readContract({
+    const [isValidated, validation, collateral, termsResult] = await Promise.all([
+      publicClient.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
         functionName: 'isValidated',
         args: [BigInt(agentId)],
       }),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.trustfulValidator,
         abi: TrustfulValidatorAbi,
         functionName: 'getValidationRecord',
         args: [BigInt(agentId)],
       }).catch(() => null),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.collateralVault,
         abi: CollateralVaultAbi,
         functionName: 'getAccount',
         args: [BigInt(agentId)],
       }).catch(() => null),
-      client.readContract({
+      publicClient.readContract({
         address: CONTRACTS.termsRegistry,
         abi: TermsRegistryAbi,
         functionName: 'getActiveTerms',
         args: [BigInt(agentId)],
       }).catch(() => null),
     ]);
+
+    // getActiveTerms returns a tuple [termsData, version] — extract the data
+    const terms = termsResult ? termsResult[0] : null;
 
     // Determine validation status
     let status: 'valid' | 'invalid' | 'revoked' = 'invalid';
@@ -391,7 +312,7 @@ router.get('/agents/:agentId/trust-info.json', async (req: Request, res: Respons
       version: '1.0',
       agentId,
       validatorAddress: CONTRACTS.trustfulValidator,
-      chainId: 84532,
+      chainId: CHAIN_ID,
       collateral: collateral ? {
         amount: formatUnits(collateral.balance, 6),
         asset: 'USDC',

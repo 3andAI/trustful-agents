@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { query, queryOne, queryMany } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSafeInfo } from '../services/safe.js';
+import { SAFE_TX_SERVICE_URL } from '../config/index.js';
 
 const router = Router();
 
@@ -58,9 +59,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
     let executedHashes: Set<string> = new Set();
     
     try {
-      const txServiceUrl = process.env.CHAIN_ID === '8453'
-        ? 'https://safe-transaction-base.safe.global'
-        : 'https://safe-transaction-base-sepolia.safe.global';
+      const txServiceUrl = SAFE_TX_SERVICE_URL;
       
       // Fetch all recent transactions (remove executed=false filter)
       const response = await fetch(
@@ -247,9 +246,7 @@ router.delete('/clear-all', requireAuth, async (req: AuthenticatedRequest, res: 
 router.post('/sync', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const safeInfo = await getSafeInfo();
-    const txServiceUrl = process.env.CHAIN_ID === '8453'
-      ? 'https://safe-transaction-base.safe.global'
-      : 'https://safe-transaction-base-sepolia.safe.global';
+    const txServiceUrl = SAFE_TX_SERVICE_URL;
 
     // Get pending transactions from our DB
     const pending = await queryMany<{ safe_tx_hash: string }>(

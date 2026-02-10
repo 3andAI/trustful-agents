@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import type { Response } from 'express';
-import { createPublicClient, http, encodeFunctionData, keccak256, toHex, type Address } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { encodeFunctionData, keccak256, toHex, type Address } from 'viem';
 import type {
   AuthenticatedRequest,
   ProposalResponse,
@@ -25,96 +24,13 @@ import {
 import { getSafeInfo } from '../services/safe.js';
 import { logAuditEvent } from '../services/members.js';
 import { notifyAllSigners } from '../services/email.js';
+import {
+  COUNCIL_REGISTRY_ADDRESS,
+  CouncilRegistryAbi as CouncilRegistryABI,
+  publicClient,
+} from '../config/index.js';
 
 const router = Router();
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '84532');
-const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
-const COUNCIL_REGISTRY_ADDRESS = process.env.COUNCIL_REGISTRY_ADDRESS as Address;
-
-// CouncilRegistry ABI for write operations
-const CouncilRegistryABI = [
-  {
-    type: 'function',
-    name: 'createCouncil',
-    inputs: [
-      { name: 'councilId', type: 'bytes32' },
-      { name: 'name', type: 'string' },
-      { name: 'description', type: 'string' },
-      { name: 'vertical', type: 'string' },
-      { name: 'quorumPercentage', type: 'uint256' },
-      { name: 'claimDepositPercentage', type: 'uint256' },
-      { name: 'votingPeriod', type: 'uint256' },
-      { name: 'evidencePeriod', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'closeCouncil',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'addMember',
-    inputs: [
-      { name: 'councilId', type: 'bytes32' },
-      { name: 'member', type: 'address' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'removeMember',
-    inputs: [
-      { name: 'councilId', type: 'bytes32' },
-      { name: 'member', type: 'address' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'getCouncil',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [
-      {
-        name: 'council',
-        type: 'tuple',
-        components: [
-          { name: 'councilId', type: 'bytes32' },
-          { name: 'name', type: 'string' },
-          { name: 'description', type: 'string' },
-          { name: 'vertical', type: 'string' },
-          { name: 'memberCount', type: 'uint256' },
-          { name: 'quorumPercentage', type: 'uint256' },
-          { name: 'claimDepositPercentage', type: 'uint256' },
-          { name: 'votingPeriod', type: 'uint256' },
-          { name: 'evidencePeriod', type: 'uint256' },
-          { name: 'active', type: 'bool' },
-          { name: 'createdAt', type: 'uint256' },
-          { name: 'closedAt', type: 'uint256' },
-        ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getAgentCount',
-    inputs: [{ name: 'councilId', type: 'bytes32' }],
-    outputs: [{ name: 'count', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const;
 
 // ============================================================================
 // Validation Schemas
@@ -156,11 +72,7 @@ const proposalIdParamSchema = z.object({
 // ============================================================================
 
 function getClient() {
-  const chain = CHAIN_ID === 8453 ? base : baseSepolia;
-  return createPublicClient({
-    chain,
-    transport: http(RPC_URL),
-  });
+  return publicClient;
 }
 
 function generateCouncilId(): `0x${string}` {
@@ -381,7 +293,7 @@ router.post(
       const agentCount = await client.readContract({
         address: COUNCIL_REGISTRY_ADDRESS,
         abi: CouncilRegistryABI,
-        functionName: 'getAgentCount',
+        functionName: 'getAgentCountByCouncil',
         args: [councilId as `0x${string}`],
       });
 
@@ -757,12 +669,10 @@ router.post(
 function prepareTransactionData(proposal: NonNullable<Awaited<ReturnType<typeof getProposal>>>) {
   switch (proposal.type) {
     case 'create_council': {
-      const councilId = generateCouncilId();
       const data = encodeFunctionData({
         abi: CouncilRegistryABI,
         functionName: 'createCouncil',
         args: [
-          councilId,
           proposal.council_name || '',
           proposal.council_description || '',
           proposal.council_vertical || '',
@@ -777,7 +687,6 @@ function prepareTransactionData(proposal: NonNullable<Awaited<ReturnType<typeof 
         data,
         value: '0',
         description: `Create Council: ${proposal.council_name}`,
-        councilId,
       };
     }
 

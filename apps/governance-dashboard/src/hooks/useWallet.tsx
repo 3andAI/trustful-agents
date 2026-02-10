@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { createWalletClient, custom, getAddress, type WalletClient, type Address } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { chain } from '../config/contracts';
 
 // Helper to checksum address
 const toChecksumAddress = (addr: string): Address => getAddress(addr);
@@ -39,7 +39,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setChainId(parseInt(chainIdHex, 16));
           
           const client = createWalletClient({
-            chain: baseSepolia,
+            chain: chain,
             transport: custom(window.ethereum),
           });
           setWalletClient(client);
@@ -97,7 +97,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setChainId(parseInt(chainIdHex, 16));
 
         const client = createWalletClient({
-          chain: baseSepolia,
+          chain: chain,
           transport: custom(window.ethereum),
         });
         setWalletClient(client);

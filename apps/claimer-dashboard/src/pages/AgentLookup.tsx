@@ -361,7 +361,7 @@ function AgentDetailView({ agentId }: { agentId: string }) {
   const { data: agentUri } = useReadContract({
     address: CONTRACTS.ERC8004_REGISTRY as Address,
     abi: ERC8004_REGISTRY_ABI,
-    functionName: 'getAgentUri',
+    functionName: 'tokenURI',
     args: [BigInt(agentId)],
     query: { enabled: isValidAgentId }
   })
