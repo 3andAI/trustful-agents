@@ -111,3 +111,86 @@ type WithdrawalInitiated @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+type TermsRegistryEmergencyWithdrawal @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  token: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsRegistryPaused @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  scope: Int! # uint8
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsRegistryPauserAdded @entity(immutable: true) {
+  id: Bytes!
+  pauser: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsRegistryPauserRemoved @entity(immutable: true) {
+  id: Bytes!
+  pauser: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsActivated @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  version: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsDeactivated @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  version: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsInvalidated @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsRegistered @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  version: BigInt! # uint256
+  contentHash: Bytes! # bytes32
+  contentUri: String! # string
+  councilId: Bytes! # bytes32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermsRegistryUnpaused @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  scope: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

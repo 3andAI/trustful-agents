@@ -57,3 +57,47 @@ dataSources:
         - event: WithdrawalInitiated(indexed uint256,uint256,uint256)
           handler: handleWithdrawalInitiated
       file: ./src/collateral-vault.ts
+  - kind: ethereum
+    name: TermsRegistry
+    network: sepolia
+    source:
+      address: "0x9553A8C080E2111BB8369EF961D1cb7191e2d795"
+      abi: TermsRegistry
+      startBlock: 10246026
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - TermsRegistryEmergencyWithdrawal
+        - TermsRegistryPaused
+        - TermsRegistryPauserAdded
+        - TermsRegistryPauserRemoved
+        - TermsActivated
+        - TermsDeactivated
+        - TermsInvalidated
+        - TermsRegistered
+        - TermsRegistryUnpaused
+      abis:
+        - name: TermsRegistry
+          file: ./abis/TermsRegistry.json
+      eventHandlers:
+        - event: EmergencyWithdrawal(indexed address,address,uint256)
+          handler: handleEmergencyWithdrawal
+        - event: Paused(indexed address,uint8,string)
+          handler: handlePaused
+        - event: PauserAdded(indexed address)
+          handler: handlePauserAdded
+        - event: PauserRemoved(indexed address)
+          handler: handlePauserRemoved
+        - event: TermsActivated(indexed uint256,indexed uint256)
+          handler: handleTermsActivated
+        - event: TermsDeactivated(indexed uint256,indexed uint256)
+          handler: handleTermsDeactivated
+        - event: TermsInvalidated(indexed uint256,string)
+          handler: handleTermsInvalidated
+        - event: TermsRegistered(indexed uint256,indexed uint256,bytes32,string,bytes32)
+          handler: handleTermsRegistered
+        - event: Unpaused(indexed address,uint8)
+          handler: handleUnpaused
+      file: ./src/terms-registry.ts

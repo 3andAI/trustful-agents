@@ -3,6 +3,9 @@
     "CollateralVault": {
       "address": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F",
       "startBlock": 10327001
+    },
+    "TermsRegistry": {
+      "address": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795"
     }
   }
 }

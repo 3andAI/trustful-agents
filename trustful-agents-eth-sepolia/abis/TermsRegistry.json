@@ -1,0 +1,686 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "registry_", "type": "address" },
+      { "internalType": "address", "name": "governance_", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "AgentNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      }
+    ],
+    "name": "AlreadyPaused",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "AlreadyPauser",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "councilId", "type": "bytes32" }
+    ],
+    "name": "CouncilNotActive",
+    "type": "error"
+  },
+  { "inputs": [], "name": "InvalidContentHash", "type": "error" },
+  { "inputs": [], "name": "InvalidContentUri", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "NoActiveTerms",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "NotAPauser",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "address", "name": "caller", "type": "address" }
+    ],
+    "name": "NotAgentOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "caller", "type": "address" }
+    ],
+    "name": "NotAuthorized",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "caller", "type": "address" }
+    ],
+    "name": "NotGovernance",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      }
+    ],
+    "name": "NotPaused",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "caller", "type": "address" }
+    ],
+    "name": "NotPauser",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "caller", "type": "address" }
+    ],
+    "name": "NotTrustfulValidator",
+    "type": "error"
+  },
+  { "inputs": [], "name": "ReentrancyGuardReentrantCall", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "uint256", "name": "version", "type": "uint256" }
+    ],
+    "name": "VersionNotFound",
+    "type": "error"
+  },
+  { "inputs": [], "name": "ZeroAddress", "type": "error" },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "EmergencyWithdrawal",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "Paused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pauser",
+        "type": "address"
+      }
+    ],
+    "name": "PauserAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pauser",
+        "type": "address"
+      }
+    ],
+    "name": "PauserRemoved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "version",
+        "type": "uint256"
+      }
+    ],
+    "name": "TermsActivated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "version",
+        "type": "uint256"
+      }
+    ],
+    "name": "TermsDeactivated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "TermsInvalidated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "version",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "contentHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "contentUri",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "councilId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "TermsRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      }
+    ],
+    "name": "Unpaused",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "pauser", "type": "address" }
+    ],
+    "name": "addPauser",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "agentRegistry",
+    "outputs": [
+      { "internalType": "address", "name": "registry", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "councilRegistry",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "reason", "type": "string" }
+    ],
+    "name": "emergencyPauseAll",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "enforceCouncilValidation",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "getActiveTerms",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "contentHash",
+            "type": "bytes32"
+          },
+          { "internalType": "string", "name": "contentUri", "type": "string" },
+          { "internalType": "bytes32", "name": "councilId", "type": "bytes32" },
+          {
+            "internalType": "uint256",
+            "name": "registeredAt",
+            "type": "uint256"
+          },
+          { "internalType": "bool", "name": "active", "type": "bool" }
+        ],
+        "internalType": "struct ITermsRegistry.TermsVersion",
+        "name": "terms",
+        "type": "tuple"
+      },
+      { "internalType": "uint256", "name": "version", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "getActiveTermsHash",
+    "outputs": [
+      { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "getCouncilForAgent",
+    "outputs": [
+      { "internalType": "bytes32", "name": "councilId", "type": "bytes32" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getPauseStatus",
+    "outputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope[]",
+        "name": "scopes",
+        "type": "uint8[]"
+      },
+      { "internalType": "bool[]", "name": "statuses", "type": "bool[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getPausers",
+    "outputs": [
+      { "internalType": "address[]", "name": "pausers", "type": "address[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "getTermsConfig",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "activeVersion",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "versionCount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ITermsRegistry.TermsConfig",
+        "name": "config",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "getTermsHistory",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "contentHash",
+            "type": "bytes32"
+          },
+          { "internalType": "string", "name": "contentUri", "type": "string" },
+          { "internalType": "bytes32", "name": "councilId", "type": "bytes32" },
+          {
+            "internalType": "uint256",
+            "name": "registeredAt",
+            "type": "uint256"
+          },
+          { "internalType": "bool", "name": "active", "type": "bool" }
+        ],
+        "internalType": "struct ITermsRegistry.TermsVersion[]",
+        "name": "versions",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "uint256", "name": "version", "type": "uint256" }
+    ],
+    "name": "getTermsVersion",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "contentHash",
+            "type": "bytes32"
+          },
+          { "internalType": "string", "name": "contentUri", "type": "string" },
+          { "internalType": "bytes32", "name": "councilId", "type": "bytes32" },
+          {
+            "internalType": "uint256",
+            "name": "registeredAt",
+            "type": "uint256"
+          },
+          { "internalType": "bool", "name": "active", "type": "bool" }
+        ],
+        "internalType": "struct ITermsRegistry.TermsVersion",
+        "name": "terms",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "governance",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "hasActiveTerms",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" }
+    ],
+    "name": "hasTerms",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "string", "name": "reason", "type": "string" }
+    ],
+    "name": "invalidateTerms",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isFullyPaused",
+    "outputs": [
+      { "internalType": "bool", "name": "allPaused", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      }
+    ],
+    "name": "isPaused",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "isPauser",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      },
+      { "internalType": "string", "name": "reason", "type": "string" }
+    ],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "bytes32", "name": "contentHash", "type": "bytes32" },
+      { "internalType": "string", "name": "contentUri", "type": "string" },
+      { "internalType": "bytes32", "name": "councilId", "type": "bytes32" }
+    ],
+    "name": "registerTerms",
+    "outputs": [
+      { "internalType": "uint256", "name": "version", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "pauser", "type": "address" }
+    ],
+    "name": "removePauser",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "councilRegistry_",
+        "type": "address"
+      }
+    ],
+    "name": "setCouncilRegistry",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bool", "name": "enforce_", "type": "bool" }],
+    "name": "setEnforceCouncilValidation",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "validator_", "type": "address" }
+    ],
+    "name": "setTrustfulValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "trustfulValidator",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ITrustfulPausable.PauseScope",
+        "name": "scope",
+        "type": "uint8"
+      }
+    ],
+    "name": "unpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "bytes32", "name": "contentHash", "type": "bytes32" },
+      { "internalType": "string", "name": "contentUri", "type": "string" },
+      { "internalType": "bytes32", "name": "councilId", "type": "bytes32" }
+    ],
+    "name": "updateTerms",
+    "outputs": [
+      { "internalType": "uint256", "name": "version", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "uint256", "name": "version", "type": "uint256" },
+      { "internalType": "bytes32", "name": "contentHash", "type": "bytes32" }
+    ],
+    "name": "verifyTermsHash",
+    "outputs": [{ "internalType": "bool", "name": "matches", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

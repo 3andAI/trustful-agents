@@ -28,8 +28,8 @@
 
   "services": {
     "apiUrl": "https://api.trustful-agents.ai",
-    "subgraphUrl": "https://api.studio.thegraph.com/query/1723244/trustful-agents-eth-sepolia/version/latest",
-    "subgraphVersion": "v0.1.0",
+    "subgraphUrl": " https://api.studio.thegraph.com/query/1723244/trustful-agents-eth-sepolia/v0.8.1",
+    "subgraphVersion": "v0.8.1",
     "ipfsGateway": "https://gateway.pinata.cloud/ipfs"
   },
 
