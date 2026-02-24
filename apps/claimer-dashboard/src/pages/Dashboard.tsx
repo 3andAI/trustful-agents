@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useAccount, useReadContract, useReadContracts } from 'wagmi'
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { 
   FileText, 
   FilePlus, 
@@ -8,9 +8,10 @@ import {
   CheckCircle, 
   XCircle,
   ArrowRight,
-  Loader2
+  Loader2,
+  Coins
 } from 'lucide-react'
-import { CONTRACTS, CLAIMS_MANAGER_ABI } from '../config/wagmi'
+import { CONTRACTS, CLAIMS_MANAGER_ABI, USDC_ABI, CHAIN_ID, USDC_DECIMALS } from '../config/wagmi'
 import { 
   formatUSDC, 
   getTimeRemaining,
@@ -24,7 +25,7 @@ import {
   type AgentMetadata
 } from '../lib/api'
 import { getCouncil, type SubgraphCouncil } from '../lib/subgraph'
-import { type Address } from 'viem'
+import { type Address, parseUnits } from 'viem'
 
 type FilterType = 'all' | 'active' | 'approved' | 'rejected'
 
@@ -176,6 +177,41 @@ export default function Dashboard() {
   const { address } = useAccount()
   const [filter, setFilter] = useState<FilterType>('all')
 
+  // ----- USDC Balance -----
+  const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
+    address: CONTRACTS.USDC as Address,
+    abi: USDC_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 15000,
+    }
+  })
+
+  // ----- TESTNET ONLY: Mint Mock USDC -----
+  // TODO: Remove this entire minting block when switching to mainnet
+  const isTestnet = CHAIN_ID !== 8453
+  const { writeContract: mintUSDC, data: mintTx, isPending: mintPending } = useWriteContract()
+  const { isLoading: mintConfirming, isSuccess: mintSuccess } = useWaitForTransactionReceipt({ hash: mintTx })
+
+  useEffect(() => {
+    if (mintSuccess) {
+      refetchBalance()
+    }
+  }, [mintSuccess, refetchBalance])
+
+  const handleMint = () => {
+    if (!address) return
+    mintUSDC({
+      address: CONTRACTS.USDC as Address,
+      abi: USDC_ABI,
+      functionName: 'mint',
+      args: [address, parseUnits('100', USDC_DECIMALS)] // 100 USDC
+    })
+  }
+  // ----- END TESTNET ONLY -----
+
   // Read claim IDs for this address directly from contract
   // Reduced polling to avoid overwhelming RPC
   const { data: claimIds, isLoading: loadingIds } = useReadContract({
@@ -257,10 +293,45 @@ export default function Dashboard() {
             {claimIdList.length} claim{claimIdList.length !== 1 ? 's' : ''} total
           </p>
         </div>
-        <Link to="/file" className="btn btn-primary">
-          <FilePlus className="w-5 h-5 mr-2" />
-          File New Claim
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* USDC Balance */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-surface-800 rounded-lg border border-surface-700">
+            <Coins className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm text-surface-400">USDC Balance:</span>
+            <span className="text-sm font-semibold text-surface-100">
+              ${usdcBalance !== undefined ? formatUSDC(usdcBalance as bigint) : '—'}
+            </span>
+          </div>
+
+          {/* ----- TESTNET ONLY: Mint Button ----- */}
+          {/* TODO: Remove this mint button when switching to mainnet */}
+          {isTestnet && (
+            <button
+              onClick={handleMint}
+              disabled={mintPending || mintConfirming}
+              className="btn bg-yellow-600 hover:bg-yellow-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Mint 100 mock USDC for testing"
+            >
+              {mintPending || mintConfirming ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {mintPending ? 'Confirm…' : 'Minting…'}
+                </>
+              ) : (
+                <>
+                  <Coins className="w-4 h-4 mr-2" />
+                  Mint 100 USDC
+                </>
+              )}
+            </button>
+          )}
+          {/* ----- END TESTNET ONLY ----- */}
+
+          <Link to="/file" className="btn btn-primary">
+            <FilePlus className="w-5 h-5 mr-2" />
+            File New Claim
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
