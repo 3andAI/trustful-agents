@@ -1,0 +1,21 @@
+{
+  "chainId": 11155111,
+  "network": "Eth Sepolia",
+  "deployedAt": "2026-02-12",
+  "deployer": "0xb1202E59429781bD95aca6a1FD8Ea7B227c88536",
+  "safe": "0x568A391C188e2aF11FA7550ACca170e085B00e7F",
+  "external": {
+    "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "validationRegistry": "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5",
+    "reputationRegistry": "0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E"
+  },
+  "contracts": {
+    "collateralVault": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F",
+    "termsRegistry": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795",
+    "councilRegistry": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C",
+    "trustfulValidator": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+    "claimsManager": "0x16F472703B8E36a74927500D144E055d37cEa97d",
+    "rulingExecutor": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028"
+  }
+}

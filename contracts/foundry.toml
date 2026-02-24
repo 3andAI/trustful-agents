@@ -49,8 +49,12 @@ invariant = { runs = 32 }
 localhost = "http://127.0.0.1:8545"
 base_sepolia = "${RPC_URL_BASE_SEPOLIA}"
 base_mainnet = "${RPC_URL_BASE_MAINNET}"
+eth_sepolia = "${RPC_URL_ETH_SEPOLIA}"
+eth_mainnet = "${RPC_URL_ETH_MAINNET}"
 
 # Etherscan verification
 [etherscan]
 base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
 base_mainnet = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
+eth_sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }
+eth_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://api.etherscan.io/api" }

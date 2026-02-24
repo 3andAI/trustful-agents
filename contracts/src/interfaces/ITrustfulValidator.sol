@@ -4,16 +4,23 @@ pragma solidity ^0.8.24;
 /**
  * @title ITrustfulValidator
  * @notice Issues and revokes ERC-8004 validations based on trust conditions
- * @dev Acts as a validator in the ERC-8004 Validation Registry pattern
- * 
+ * @dev Acts as a validator in the ERC-8004 Validation Registry request/response pattern.
+ *
+ * v2.0 Changes (Eth Sepolia / ERC-8004 integration):
+ * - Removed `requestValidation` — agent owners now call `validationRequest()` on the
+ *   ERC-8004 Validation Registry; an off-chain keeper triggers `respondToRequest()` here.
+ * - Removed `checkValidation` — replaced by `reevaluate()`, which also writes back to
+ *   the Validation Registry.
+ * - Removed `computeRequestHash` — the requestHash is created externally by the agent owner.
+ * - Added `respondToRequest(bytes32)` — primary entry point for the keeper.
+ * - Added `reevaluate(uint256)` — updates the Validation Registry when conditions change.
+ * - Added `getActiveRequestHash(uint256)` — exposes the active request hash per agent.
+ *
  * v1.2 Changes:
  * - Removed `hasValidMaxPayout` from ValidationConditions (maxPayoutPerClaim is now off-chain)
  * - Removed `MaxPayoutZero` from RevocationReason
  * - Updated `getTrustInfo()` to not return maxPayoutPerClaim
  * - Added `termsContentUri` to getTrustInfo for clients to fetch T&C document
- * 
- * Note: maxPayoutPerClaim now lives in the T&C document (off-chain, IPFS).
- * Clients should fetch the T&C document and read maxPayoutPerClaim from there.
  */
 interface ITrustfulValidator {
     // =========================================================================
@@ -89,28 +96,30 @@ interface ITrustfulValidator {
     // =========================================================================
 
     /**
-     * @notice Request validation for an agent
-     * @param agentId The ERC-8004 token ID
-     * @return requestHash The ERC-8004 request hash
-     * @dev Only agent owner can call
-     * @dev Reverts if conditions not met
+     * @notice Respond to an ERC-8004 validation request
+     * @param requestHash The request hash from the Validation Registry
+     * @dev Called by the off-chain keeper when a ValidationRequest event targets this contract.
+     *      Permissionless — the Validation Registry enforces that only the designated validator
+     *      contract can submit responses.
      */
-    function requestValidation(uint256 agentId) external returns (bytes32 requestHash);
+    function respondToRequest(bytes32 requestHash) external;
+
+    /**
+     * @notice Re-evaluate validation for an agent and update the Validation Registry
+     * @param agentId The ERC-8004 token ID
+     * @dev Callable by anyone. The keeper calls this when collateral/claims/terms change.
+     *      If no active request exists for this agent, this is a no-op.
+     *      Per ERC-8004, validationResponse() can be called multiple times for the same requestHash.
+     */
+    function reevaluate(uint256 agentId) external;
 
     /**
      * @notice Revoke validation manually
      * @param agentId The ERC-8004 token ID
-     * @dev Only agent owner or governance can call
+     * @dev Only agent owner or governance can call.
+     *      Also submits score=0 to the Validation Registry.
      */
     function revokeValidation(uint256 agentId) external;
-
-    /**
-     * @notice Check and update validation status based on current conditions
-     * @param agentId The ERC-8004 token ID
-     * @dev Can be called by anyone
-     * @dev Will revoke if conditions no longer met
-     */
-    function checkValidation(uint256 agentId) external;
 
     // =========================================================================
     // View Functions
@@ -158,15 +167,11 @@ interface ITrustfulValidator {
     function getResponseUri(uint256 agentId) external view returns (string memory uri);
 
     /**
-     * @notice Compute the ERC-8004 request hash
-     * @param agentId The ERC-8004 token ID
-     * @param nonce The validation nonce
-     * @return requestHash The computed request hash
+     * @notice Get the active ERC-8004 request hash for an agent
+     * @param agentId The agent token ID
+     * @return requestHash The active request hash (bytes32(0) if none)
      */
-    function computeRequestHash(uint256 agentId, uint256 nonce)
-        external
-        view
-        returns (bytes32 requestHash);
+    function getActiveRequestHash(uint256 agentId) external view returns (bytes32 requestHash);
 
     /**
      * @notice Get trust info for A2A Agent Card extension

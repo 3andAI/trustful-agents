@@ -8,19 +8,23 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 /**
  * @title TrustfulValidator
  * @notice Issues and revokes ERC-8004 validations based on trust conditions
- * @dev Acts as a validator in the ERC-8004 Validation Registry pattern
+ * @dev Acts as a validator in the ERC-8004 Validation Registry request/response pattern.
  *
- * Key Design Decisions:
- * - Reactive validation: conditions checked on request and via checkValidation
- * - Anyone can trigger checkValidation to revoke non-compliant agents
- * - Minimum collateral threshold configurable by governance
- * - Request hash follows ERC-8004 spec: keccak256(abi.encode(agentId, nonce, validatorAddress))
- * - Response URI is deterministic: baseUri/agentId
+ * v2.0 — ERC-8004 Validation Registry integration:
+ *
+ * Flow:
+ * 1. Agent owner calls validationRequest(TrustfulValidator, agentId, ...) on the
+ *    ERC-8004 Validation Registry.
+ * 2. Off-chain keeper detects the ValidationRequest event and calls respondToRequest(requestHash).
+ * 3. TrustfulValidator checks trust conditions and calls validationResponse() on the
+ *    Validation Registry with score 100 (pass) or 0 (fail) plus a namespaced tag.
+ * 4. When conditions change (collateral, claims, terms), keeper calls reevaluate(agentId)
+ *    to submit an updated response.
  *
  * Validation Conditions:
  * 1. Collateral >= minimumCollateral
  * 2. Active terms registered (not invalidated)
- * 3. Agent ownership valid (exists in registry)
+ * 3. Agent ownership valid (exists in Identity Registry)
  * 4. Council is active (optional, when CouncilRegistry set)
  */
 contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGuard {
@@ -31,8 +35,15 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     /// @notice Validation records per agent
     mapping(uint256 => ValidationRecord) private _validations;
 
-    /// @notice The ERC-8004 agent registry
+    /// @notice Active request hash per agent (agentId -> requestHash)
+    /// @dev Used for reevaluation: when conditions change, look up the requestHash to submit updated response
+    mapping(uint256 => bytes32) private _activeRequestHash;
+
+    /// @notice The ERC-8004 Identity Registry (agent ownership)
     IERC8004Registry private immutable _REGISTRY;
+
+    /// @notice The ERC-8004 Validation Registry (request/response)
+    IValidationRegistry public validationRegistry;
 
     /// @notice The CollateralVault contract
     ICollateralVault public collateralVault;
@@ -60,6 +71,17 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     uint256 public constant DEFAULT_MIN_COLLATERAL = 100e6;
 
     // =========================================================================
+    // ERC-8004 Tag Constants (bytes32)
+    // =========================================================================
+
+    bytes32 public constant TAG_VALID = keccak256("trustful.v1.valid");
+    bytes32 public constant TAG_REVOKED_COLLATERAL = keccak256("trustful.v1.revoked.collateral_below_min");
+    bytes32 public constant TAG_REVOKED_TERMS = keccak256("trustful.v1.revoked.terms_inactive");
+    bytes32 public constant TAG_REVOKED_OWNER = keccak256("trustful.v1.revoked.owner_changed");
+    bytes32 public constant TAG_REVOKED_COUNCIL = keccak256("trustful.v1.revoked.council_inactive");
+    bytes32 public constant TAG_REVOKED_MANUAL = keccak256("trustful.v1.revoked.manual");
+
+    // =========================================================================
     // Errors
     // =========================================================================
 
@@ -77,17 +99,17 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
 
     /**
      * @notice Initialize the TrustfulValidator
-     * @param registry_ The ERC-8004 agent registry address
+     * @param identityRegistry_ The ERC-8004 Identity Registry address (agent ownership)
      * @param governance_ The governance multisig address
      * @param baseUri_ The base URI for validation responses
      */
     constructor(
-        address registry_,
+        address identityRegistry_,
         address governance_,
         string memory baseUri_
     ) TrustfulPausable(governance_) {
-        if (registry_ == address(0)) revert ZeroAddress();
-        _REGISTRY = IERC8004Registry(registry_);
+        if (identityRegistry_ == address(0)) revert ZeroAddress();
+        _REGISTRY = IERC8004Registry(identityRegistry_);
         validationBaseUri = baseUri_;
         minimumCollateral = DEFAULT_MIN_COLLATERAL;
     }
@@ -95,6 +117,15 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     // =========================================================================
     // Admin Functions
     // =========================================================================
+
+    /**
+     * @notice Set the ERC-8004 Validation Registry address
+     * @param registry_ The Validation Registry address
+     */
+    function setValidationRegistry(address registry_) external onlyGovernance {
+        if (registry_ == address(0)) revert ZeroAddress();
+        validationRegistry = IValidationRegistry(registry_);
+    }
 
     /**
      * @notice Set the CollateralVault address
@@ -151,36 +182,93 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     // =========================================================================
 
     /// @inheritdoc ITrustfulValidator
-    function requestValidation(uint256 agentId) external nonReentrant returns (bytes32 requestHash) {
-        _requireAgentOwner(agentId);
+    function respondToRequest(bytes32 requestHash) external nonReentrant {
         _requireConfigured();
 
-        ValidationRecord storage record = _validations[agentId];
+        // 1. Read request details from Validation Registry
+        (address validatorAddress, uint256 agentId,,,,) =
+            validationRegistry.getValidationStatus(requestHash);
 
-        // Check if already validated
-        if (_isCurrentlyValid(record)) {
-            revert AlreadyValidated(agentId);
-        }
+        // 2. Verify this request is for us
+        if (validatorAddress != address(this)) revert NotAuthorized(msg.sender);
 
-        // Check conditions
+        // 3. Verify agent exists
+        if (!_agentExists(agentId)) revert AgentNotFound(agentId);
+
+        // 4. Check trust conditions
         ValidationConditions memory conditions = _checkConditions(agentId);
-        if (!_allConditionsMet(conditions)) {
-            revert ConditionsNotMet(agentId, conditions);
+        bool passed = _allConditionsMet(conditions);
+
+        // 5. Store internal mapping for future reevaluation
+        _activeRequestHash[agentId] = requestHash;
+
+        // 6. Update internal validation record
+        ValidationRecord storage record = _validations[agentId];
+        record.requestHash = requestHash;
+        record.nonce += 1;
+        if (passed) {
+            record.issuedAt = block.timestamp;
+            record.revokedAt = 0;
+            record.revocationReason = RevocationReason.None;
+        } else {
+            record.revokedAt = block.timestamp;
+            record.revocationReason = _determineRevocationReason(conditions);
         }
 
-        // Issue validation
-        record.nonce += 1;
-        record.issuedAt = block.timestamp;
-        record.revokedAt = 0;
-        record.revocationReason = RevocationReason.None;
-        record.requestHash = computeRequestHash(agentId, record.nonce);
-
+        // 7. Submit response to ERC-8004 Validation Registry
+        uint8 score = passed ? 100 : 0;
         string memory responseUri = getResponseUri(agentId);
+        bytes32 responseHash = keccak256(abi.encode(agentId, score, block.timestamp));
+        bytes32 tag = passed ? TAG_VALID : _conditionsToTag(conditions);
 
-        emit ValidationIssued(agentId, record.requestHash, record.nonce, responseUri);
+        validationRegistry.validationResponse(requestHash, score, responseUri, responseHash, tag);
+
+        // 8. Emit internal events
+        if (passed) {
+            emit ValidationIssued(agentId, requestHash, record.nonce, responseUri);
+        }
         emit ValidationConditionsChanged(agentId, conditions);
+    }
 
-        return record.requestHash;
+    /// @inheritdoc ITrustfulValidator
+    function reevaluate(uint256 agentId) external nonReentrant {
+        bytes32 requestHash = _activeRequestHash[agentId];
+
+        // No active validation request for this agent — nothing to update
+        if (requestHash == bytes32(0)) return;
+
+        // Must have Validation Registry configured
+        if (address(validationRegistry) == address(0)) return;
+
+        // Check current conditions
+        ValidationConditions memory conditions = _checkConditions(agentId);
+        bool passed = _allConditionsMet(conditions);
+
+        // Update internal record
+        ValidationRecord storage record = _validations[agentId];
+        bool wasValid = _isCurrentlyValid(record);
+
+        if (passed && !wasValid) {
+            // Conditions now met — restore validation
+            record.issuedAt = block.timestamp;
+            record.revokedAt = 0;
+            record.revocationReason = RevocationReason.None;
+            emit ValidationIssued(agentId, requestHash, record.nonce, getResponseUri(agentId));
+        } else if (!passed && wasValid) {
+            // Conditions no longer met — revoke
+            RevocationReason reason = _determineRevocationReason(conditions);
+            _revoke(agentId, record, reason);
+        }
+
+        // Submit updated response to ERC-8004 Validation Registry
+        uint8 score = passed ? 100 : 0;
+        string memory responseUri = getResponseUri(agentId);
+        bytes32 responseHash = keccak256(abi.encode(agentId, score, block.timestamp));
+        bytes32 tag = passed ? TAG_VALID : _conditionsToTag(conditions);
+
+        validationRegistry.validationResponse(requestHash, score, responseUri, responseHash, tag);
+
+        emit ValidationConditionsChanged(agentId, conditions);
     }
 
     /// @inheritdoc ITrustfulValidator
@@ -197,32 +285,17 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
         }
 
         _revoke(agentId, record, RevocationReason.ManualRevocation);
-    }
 
-    /// @inheritdoc ITrustfulValidator
-    function checkValidation(uint256 agentId) external nonReentrant {
-        ValidationRecord storage record = _validations[agentId];
+        // Submit revocation to Validation Registry
+        bytes32 requestHash = _activeRequestHash[agentId];
+        if (requestHash != bytes32(0) && address(validationRegistry) != address(0)) {
+            string memory responseUri = getResponseUri(agentId);
+            bytes32 responseHash = keccak256(abi.encode(agentId, uint8(0), block.timestamp));
 
-        // Only check if currently validated
-        if (!_isCurrentlyValid(record)) {
-            return;
+            validationRegistry.validationResponse(
+                requestHash, 0, responseUri, responseHash, TAG_REVOKED_MANUAL
+            );
         }
-
-        // Check conditions
-        ValidationConditions memory conditions = _checkConditions(agentId);
-
-        // Revoke if any condition fails
-        if (!conditions.hasMinimumCollateral) {
-            _revoke(agentId, record, RevocationReason.CollateralBelowMinimum);
-        } else if (!conditions.hasActiveTerms) {
-            _revoke(agentId, record, RevocationReason.TermsInvalidated);
-        } else if (!conditions.isOwnerValid) {
-            _revoke(agentId, record, RevocationReason.OwnershipChanged);
-        } else if (enforceCouncilValidation && !conditions.councilIsActive) {
-            _revoke(agentId, record, RevocationReason.TermsInvalidated);
-        }
-
-        emit ValidationConditionsChanged(agentId, conditions);
     }
 
     // =========================================================================
@@ -277,12 +350,8 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     }
 
     /// @inheritdoc ITrustfulValidator
-    function computeRequestHash(uint256 agentId, uint256 nonce)
-        public
-        view
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(agentId, nonce, address(this)));
+    function getActiveRequestHash(uint256 agentId) external view returns (bytes32) {
+        return _activeRequestHash[agentId];
     }
 
     /// @inheritdoc ITrustfulValidator
@@ -307,7 +376,7 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     }
 
     /**
-     * @notice Get the ERC-8004 registry address
+     * @notice Get the ERC-8004 Identity Registry address
      * @return registry The registry address
      */
     function agentRegistry() external view returns (address) {
@@ -397,22 +466,60 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
     }
 
     /**
-     * @notice Require configuration is complete
+     * @notice Map RevocationReason enum to ERC-8004 tag
+     * @param reason The revocation reason
+     * @return tag The bytes32 tag for the Validation Registry
      */
-    function _requireConfigured() internal view {
-        if (address(collateralVault) == address(0) || address(termsRegistry) == address(0)) {
-            revert InvalidConfiguration();
-        }
+    function _reasonToTag(RevocationReason reason) internal pure returns (bytes32) {
+        if (reason == RevocationReason.CollateralBelowMinimum) return TAG_REVOKED_COLLATERAL;
+        if (reason == RevocationReason.TermsNotRegistered) return TAG_REVOKED_TERMS;
+        if (reason == RevocationReason.TermsInvalidated) return TAG_REVOKED_TERMS;
+        if (reason == RevocationReason.OwnershipChanged) return TAG_REVOKED_OWNER;
+        if (reason == RevocationReason.ManualRevocation) return TAG_REVOKED_MANUAL;
+        if (reason == RevocationReason.EmergencyPause) return TAG_REVOKED_MANUAL;
+        return TAG_VALID; // fallback (should not happen for revocations)
     }
 
     /**
-     * @notice Require caller is agent owner
-     * @param agentId The agent ID
+     * @notice Derive tag from failed conditions (when no explicit RevocationReason exists yet)
+     * @dev Checks conditions in priority order — first failing condition determines the tag
+     * @param conditions The validation conditions
+     * @return tag The bytes32 tag
      */
-    function _requireAgentOwner(uint256 agentId) internal view {
-        address owner = _getAgentOwner(agentId);
-        if (msg.sender != owner) {
-            revert NotAgentOwner(agentId, msg.sender);
+    function _conditionsToTag(ValidationConditions memory conditions) internal view returns (bytes32) {
+        if (!conditions.hasMinimumCollateral) return TAG_REVOKED_COLLATERAL;
+        if (!conditions.hasActiveTerms) return TAG_REVOKED_TERMS;
+        if (!conditions.isOwnerValid) return TAG_REVOKED_OWNER;
+        if (enforceCouncilValidation && !conditions.councilIsActive) return TAG_REVOKED_COUNCIL;
+        return TAG_VALID;
+    }
+
+    /**
+     * @notice Determine revocation reason from failed conditions
+     * @param conditions The validation conditions
+     * @return reason The revocation reason
+     */
+    function _determineRevocationReason(ValidationConditions memory conditions)
+        internal
+        view
+        returns (RevocationReason)
+    {
+        if (!conditions.hasMinimumCollateral) return RevocationReason.CollateralBelowMinimum;
+        if (!conditions.hasActiveTerms) return RevocationReason.TermsInvalidated;
+        if (!conditions.isOwnerValid) return RevocationReason.OwnershipChanged;
+        if (enforceCouncilValidation && !conditions.councilIsActive) return RevocationReason.TermsInvalidated;
+        return RevocationReason.None;
+    }
+
+    /**
+     * @notice Require configuration is complete
+     */
+    function _requireConfigured() internal view {
+        if (
+            address(collateralVault) == address(0) || address(termsRegistry) == address(0)
+                || address(validationRegistry) == address(0)
+        ) {
+            revert InvalidConfiguration();
         }
     }
 
@@ -471,6 +578,42 @@ contract TrustfulValidator is ITrustfulValidator, TrustfulPausable, ReentrancyGu
 
 interface IERC8004Registry {
     function ownerOf(uint256 tokenId) external view returns (address);
+}
+
+interface IValidationRegistry {
+    /// @notice Submit a validation response
+    /// @param requestHash The request hash from the original validationRequest
+    /// @param response Score 0-100 (100 = pass, 0 = fail/revoked)
+    /// @param responseURI URI to off-chain evidence/audit
+    /// @param responseHash Hash of the response data
+    /// @param tag Custom categorization tag (bytes32)
+    function validationResponse(
+        bytes32 requestHash,
+        uint8 response,
+        string calldata responseURI,
+        bytes32 responseHash,
+        bytes32 tag
+    ) external;
+
+    /// @notice Get validation status for a request
+    /// @param requestHash The request hash
+    /// @return validatorAddress The validator that should respond
+    /// @return agentId The agent being validated
+    /// @return response The current response score
+    /// @return responseHash The response data hash
+    /// @return tag The categorization tag
+    /// @return lastUpdate Timestamp of last update
+    function getValidationStatus(bytes32 requestHash)
+        external
+        view
+        returns (
+            address validatorAddress,
+            uint256 agentId,
+            uint8 response,
+            bytes32 responseHash,
+            bytes32 tag,
+            uint256 lastUpdate
+        );
 }
 
 interface ICollateralVault {

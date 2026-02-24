@@ -1,0 +1,246 @@
+{
+  "version": "1.0",
+  "chainId": "11155111",
+  "createdAt": 1739366400000,
+  "meta": {
+    "name": "Trustful Agents — Eth Sepolia Wiring",
+    "description": "Wire all 6 Trustful Agents contracts + set minimum collateral to 10 USDC",
+    "txBuilderVersion": "1.16.5"
+  },
+  "transactions": [
+    {
+      "to": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "claimsManager_", "type": "address" }],
+        "name": "setClaimsManager",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "claimsManager_": "0x16F472703B8E36a74927500D144E055d37cEa97d"
+      }
+    },
+    {
+      "to": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "rulingExecutor_", "type": "address" }],
+        "name": "setRulingExecutor",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "rulingExecutor_": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028"
+      }
+    },
+    {
+      "to": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "validator_", "type": "address" }],
+        "name": "setTrustfulValidator",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "validator_": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F"
+      }
+    },
+    {
+      "to": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "councilRegistry_", "type": "address" }],
+        "name": "setCouncilRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "councilRegistry_": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C"
+      }
+    },
+    {
+      "to": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "termsRegistry_", "type": "address" }],
+        "name": "setTermsRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "termsRegistry_": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795"
+      }
+    },
+    {
+      "to": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "claimsManager_", "type": "address" }],
+        "name": "setClaimsManager",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "claimsManager_": "0x16F472703B8E36a74927500D144E055d37cEa97d"
+      }
+    },
+    {
+      "to": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "vault_", "type": "address" }],
+        "name": "setCollateralVault",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "vault_": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F"
+      }
+    },
+    {
+      "to": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setTermsRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795"
+      }
+    },
+    {
+      "to": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setCouncilRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C"
+      }
+    },
+    {
+      "to": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setValidationRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5"
+      }
+    },
+    {
+      "to": "0x16e57Df3Df09c18D239021c15ca6C34739dDD90F",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "uint256", "name": "amount_", "type": "uint256" }],
+        "name": "setMinimumCollateral",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "amount_": "10000000"
+      }
+    },
+    {
+      "to": "0x16F472703B8E36a74927500D144E055d37cEa97d",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "vault_", "type": "address" }],
+        "name": "setCollateralVault",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "vault_": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F"
+      }
+    },
+    {
+      "to": "0x16F472703B8E36a74927500D144E055d37cEa97d",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setTermsRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0x9553A8C080E2111BB8369EF961D1cb7191e2d795"
+      }
+    },
+    {
+      "to": "0x16F472703B8E36a74927500D144E055d37cEa97d",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setCouncilRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C"
+      }
+    },
+    {
+      "to": "0x16F472703B8E36a74927500D144E055d37cEa97d",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "executor_", "type": "address" }],
+        "name": "setRulingExecutor",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "executor_": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028"
+      }
+    },
+    {
+      "to": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "manager_", "type": "address" }],
+        "name": "setClaimsManager",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "manager_": "0x16F472703B8E36a74927500D144E055d37cEa97d"
+      }
+    },
+    {
+      "to": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "vault_", "type": "address" }],
+        "name": "setCollateralVault",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "vault_": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F"
+      }
+    },
+    {
+      "to": "0xaFd95218dfE0203722B56C4234Fa687c64C8A028",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [{ "internalType": "address", "name": "registry_", "type": "address" }],
+        "name": "setCouncilRegistry",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "registry_": "0xbD7a50A4E6Bb398e1ACC4C6A265d34c3cebdF63C"
+      }
+    }
+  ]
+}
