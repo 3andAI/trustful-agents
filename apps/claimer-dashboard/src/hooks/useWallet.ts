@@ -1,5 +1,5 @@
 import { useAccount, useConnect, useDisconnect, useSwitchChain, useSignMessage } from 'wagmi'
-import { baseSepolia } from 'wagmi/chains'
+import { CHAIN_ID } from '../config/contracts'
 
 export function useWallet() {
   const { address, isConnected, chain } = useAccount()
@@ -8,10 +8,10 @@ export function useWallet() {
   const { switchChain } = useSwitchChain()
   const { signMessageAsync } = useSignMessage()
 
-  const isWrongNetwork = isConnected && chain?.id !== baseSepolia.id
+  const isWrongNetwork = isConnected && chain?.id !== CHAIN_ID
 
-  const switchToBaseSepolia = () => {
-    switchChain({ chainId: baseSepolia.id })
+  const switchToCorrectNetwork = () => {
+    switchChain({ chainId: CHAIN_ID })
   }
 
   const signMessage = async (message: string) => {
@@ -27,8 +27,8 @@ export function useWallet() {
     connectors,
     connect,
     disconnect,
-    switchToBaseSepolia,
+    switchToCorrectNetwork,
+    switchToBaseSepolia: switchToCorrectNetwork,
     signMessage,
-    baseSepolia
   }
 }

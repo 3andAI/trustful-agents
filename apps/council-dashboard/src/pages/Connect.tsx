@@ -88,7 +88,7 @@ export default function ConnectPage() {
 
         {/* Footer */}
         <p className="text-center text-governance-600 text-xs mt-6">
-          Powered by ERC-8004 • Base Sepolia Testnet
+          Powered by ERC-8004 • Eth Sepolia Testnet
         </p>
       </div>
     </div>

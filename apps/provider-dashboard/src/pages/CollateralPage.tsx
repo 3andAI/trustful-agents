@@ -453,7 +453,7 @@ function DepositForm({ agentId, usdcBalance, allowance, onSuccess }: DepositForm
 
         {/* Testnet faucet */}
         <div className="pt-4 border-t border-surface-800">
-          <p className="text-sm text-surface-500 mb-2">Need test USDC? (Base Sepolia only)</p>
+          <p className="text-sm text-surface-500 mb-2">Need test USDC?</p>
           <Button
             variant="secondary"
             size="sm"

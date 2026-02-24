@@ -12,6 +12,7 @@
     "codegen": "graph codegen",
     "build": "graph build",
     "deploy": "graph deploy --studio trustful-agents",
+    "deploy:eth-sepolia": "graph deploy --studio trustful-agents-eth-sepolia",
     "deploy:hosted": "graph deploy --product hosted-service YOUR_GITHUB/trustful-agents",
     "create:local": "graph create --node http://localhost:8020/ trustful-agents",
     "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 trustful-agents",

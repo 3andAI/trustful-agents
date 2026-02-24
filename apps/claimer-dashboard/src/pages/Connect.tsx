@@ -60,7 +60,7 @@ export default function Connect() {
           )}
 
           <p className="text-sm text-surface-500 mt-6">
-            Make sure you're connected to Base Sepolia testnet
+            Make sure you're connected to the correct testnet
           </p>
 
           {/* Info */}

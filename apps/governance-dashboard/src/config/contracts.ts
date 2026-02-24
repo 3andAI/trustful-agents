@@ -16,6 +16,6 @@ export {
 } from '../../../../config/generated/contracts';
 
 // Chain helper
-import { base, baseSepolia, type Chain } from 'viem/chains';
+import { base, baseSepolia, sepolia, type Chain } from 'viem/chains';
 import { CHAIN_ID } from '../../../../config/generated/contracts';
-export const chain: Chain = CHAIN_ID === 8453 ? base : baseSepolia;
+export const chain: Chain = CHAIN_ID === 8453 ? base : CHAIN_ID === 11155111 ? sepolia : baseSepolia;

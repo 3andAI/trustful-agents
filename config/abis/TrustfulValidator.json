@@ -3,7 +3,7 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "registry_",
+        "name": "identityRegistry_",
         "type": "address",
         "internalType": "address"
       },
@@ -29,6 +29,84 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_REVOKED_COLLATERAL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_REVOKED_COUNCIL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_REVOKED_MANUAL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_REVOKED_OWNER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_REVOKED_TERMS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TAG_VALID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -102,19 +180,6 @@
   },
   {
     "type": "function",
-    "name": "checkValidation",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "collateralVault",
     "inputs": [],
     "outputs": [
@@ -122,30 +187,6 @@
         "name": "",
         "type": "address",
         "internalType": "contract ICollateralVault"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "computeRequestHash",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "nonce",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -185,6 +226,25 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getActiveRequestHash",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -471,6 +531,19 @@
   },
   {
     "type": "function",
+    "name": "reevaluate",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "removePauser",
     "inputs": [
       {
@@ -484,21 +557,15 @@
   },
   {
     "type": "function",
-    "name": "requestValidation",
+    "name": "respondToRequest",
     "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
       {
         "name": "requestHash",
         "type": "bytes32",
         "internalType": "bytes32"
       }
     ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -594,6 +661,19 @@
   },
   {
     "type": "function",
+    "name": "setValidationRegistry",
+    "inputs": [
+      {
+        "name": "registry_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "termsRegistry",
     "inputs": [],
     "outputs": [
@@ -627,6 +707,19 @@
         "name": "",
         "type": "string",
         "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "validationRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IValidationRegistry"
       }
     ],
     "stateMutability": "view"

@@ -1,0 +1,8 @@
+{
+  "sepolia": {
+    "CollateralVault": {
+      "address": "0xba911c9AE66a4a6671e5964A95Af91Ba65b4493F",
+      "startBlock": 10327001
+    }
+  }
+}

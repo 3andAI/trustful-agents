@@ -153,7 +153,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <span className="inline-flex items-center gap-2 text-xs text-governance-500">
             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            Base Sepolia Testnet
+            Eth Sepolia Testnet
           </span>
         </div>
       </div>

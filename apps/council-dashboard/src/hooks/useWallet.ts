@@ -1,5 +1,5 @@
 import { useAccount, useConnect, useDisconnect, useSignMessage, useSwitchChain } from 'wagmi';
-import { baseSepolia } from 'wagmi/chains';
+import { CHAIN_ID } from '../config/contracts';
 
 export function useWallet() {
   const { address, isConnected, chain } = useAccount();
@@ -8,7 +8,7 @@ export function useWallet() {
   const { signMessageAsync } = useSignMessage();
   const { switchChain } = useSwitchChain();
 
-  const isWrongNetwork = isConnected && chain?.id !== baseSepolia.id;
+  const isWrongNetwork = isConnected && chain?.id !== CHAIN_ID;
 
   const connectWallet = async () => {
     // Use injected wallet (MetaMask) by default
@@ -24,8 +24,8 @@ export function useWallet() {
     return signMessageAsync({ message });
   };
 
-  const switchToBaseSepolia = () => {
-    switchChain({ chainId: baseSepolia.id });
+  const switchToCorrectNetwork = () => {
+    switchChain({ chainId: CHAIN_ID });
   };
 
   return {
@@ -40,6 +40,8 @@ export function useWallet() {
     connect: connectWallet,
     disconnect,
     signMessage,
-    switchToBaseSepolia,
+    switchToCorrectNetwork,
+    // Backward compat alias
+    switchToBaseSepolia: switchToCorrectNetwork,
   };
 }

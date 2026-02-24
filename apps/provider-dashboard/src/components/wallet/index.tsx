@@ -61,7 +61,7 @@ export function ConnectButton({ className }: { className?: string }) {
         leftIcon={<AlertTriangle className="w-4 h-4" />}
         className={className}
       >
-        Switch to Base Sepolia
+        Switch Network
       </Button>
     )
   }
@@ -188,7 +188,7 @@ export function ConnectPrompt() {
             ))}
           </div>
           
-          <p className="text-sm text-surface-500 mt-6">Make sure you're on Base Sepolia testnet</p>
+          <p className="text-sm text-surface-500 mt-6">Make sure you're on the correct network</p>
         </div>
       </div>
     </div>

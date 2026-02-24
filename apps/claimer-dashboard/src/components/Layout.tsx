@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAccount, useDisconnect } from 'wagmi'
+import { CHAIN_ID } from '../config/contracts'
 import { 
   LayoutDashboard, 
   FilePlus, 
@@ -21,7 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { address, chain } = useAccount()
   const { disconnect } = useDisconnect()
 
-  const isWrongNetwork = chain?.id !== 84532
+  const isWrongNetwork = chain?.id !== CHAIN_ID
 
   return (
     <div className="min-h-screen bg-surface-900 flex">
@@ -92,7 +93,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           {isWrongNetwork && (
             <p className="text-xs text-danger">
-              Please switch to Base Sepolia
+              Please switch to the correct network
             </p>
           )}
         </div>

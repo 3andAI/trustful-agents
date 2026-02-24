@@ -75,7 +75,7 @@ export default function Layout() {
               onClick={switchToBaseSepolia}
               className="mt-2 w-full text-xs text-warning hover:text-warning-dark underline"
             >
-              Switch to Base Sepolia
+              Switch Network
             </button>
           </div>
         )}

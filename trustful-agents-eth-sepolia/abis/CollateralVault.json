@@ -1,0 +1,736 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      { "name": "usdc_", "type": "address", "internalType": "address" },
+      { "name": "registry_", "type": "address", "internalType": "address" },
+      { "name": "governance_", "type": "address", "internalType": "address" },
+      { "name": "gracePeriod_", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "AgentNotFound",
+    "type": "error",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  {
+    "name": "AlreadyPaused",
+    "type": "error",
+    "inputs": [
+      {
+        "name": "scope",
+        "type": "uint8",
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      }
+    ]
+  },
+  {
+    "name": "AlreadyPauser",
+    "type": "error",
+    "inputs": [
+      { "name": "account", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "GracePeriodNotElapsed",
+    "type": "error",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "executeAfter", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  {
+    "name": "InsufficientBalance",
+    "type": "error",
+    "inputs": [
+      { "name": "available", "type": "uint256", "internalType": "uint256" },
+      { "name": "requested", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  {
+    "name": "InsufficientUnlockedBalance",
+    "type": "error",
+    "inputs": [
+      { "name": "available", "type": "uint256", "internalType": "uint256" },
+      { "name": "requested", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  {
+    "name": "NoWithdrawalPending",
+    "type": "error",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  {
+    "name": "NotAPauser",
+    "type": "error",
+    "inputs": [
+      { "name": "account", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotAgentOwner",
+    "type": "error",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotAuthorized",
+    "type": "error",
+    "inputs": [
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotClaimsManager",
+    "type": "error",
+    "inputs": [
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotGovernance",
+    "type": "error",
+    "inputs": [
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotPaused",
+    "type": "error",
+    "inputs": [
+      {
+        "name": "scope",
+        "type": "uint8",
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      }
+    ]
+  },
+  {
+    "name": "NotPauser",
+    "type": "error",
+    "inputs": [
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "NotRulingExecutor",
+    "type": "error",
+    "inputs": [
+      { "name": "caller", "type": "address", "internalType": "address" }
+    ]
+  },
+  { "name": "ReentrancyGuardReentrantCall", "type": "error", "inputs": [] },
+  {
+    "name": "SafeERC20FailedOperation",
+    "type": "error",
+    "inputs": [
+      { "name": "token", "type": "address", "internalType": "address" }
+    ]
+  },
+  {
+    "name": "WithdrawalAlreadyPending",
+    "type": "error",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ]
+  },
+  { "name": "ZeroAddress", "type": "error", "inputs": [] },
+  { "name": "ZeroAmount", "type": "error", "inputs": [] },
+  {
+    "name": "CollateralLocked",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "claimId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "CollateralSlashed",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "claimId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "CollateralUnlocked",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "claimId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "Deposited",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "depositor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "EmergencyWithdrawal",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "Paused",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "scope",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "PauserAdded",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "PauserRemoved",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "Unpaused",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "scope",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "WithdrawalCancelled",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "WithdrawalExecuted",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "WithdrawalInitiated",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "executeAfter",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "name": "DEFAULT_GRACE_PERIOD",
+    "type": "function",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "addPauser",
+    "type": "function",
+    "inputs": [
+      { "name": "pauser", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "agentRegistry",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      { "name": "registry", "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "canExecuteWithdrawal",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      { "name": "canExecute", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "cancelWithdrawal",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "claimsManager",
+    "type": "function",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "deposit",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "emergencyPauseAll",
+    "type": "function",
+    "inputs": [
+      { "name": "reason", "type": "string", "internalType": "string" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "executeWithdrawal",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "getAccount",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "account",
+        "type": "tuple",
+        "components": [
+          { "name": "balance", "type": "uint256", "internalType": "uint256" },
+          {
+            "name": "lockedAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "withdrawalInitiatedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "internalType": "struct ICollateralVault.CollateralAccount"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "getAvailableBalance",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      { "name": "available", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "getLockedForClaim",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "claimId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      { "name": "locked", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "getPauseStatus",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "scopes",
+        "type": "uint8[]",
+        "internalType": "enum ITrustfulPausable.PauseScope[]"
+      },
+      { "name": "statuses", "type": "bool[]", "internalType": "bool[]" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "getPausers",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      { "name": "pausers", "type": "address[]", "internalType": "address[]" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "governance",
+    "type": "function",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "gracePeriod",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      { "name": "period", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "initiateWithdrawal",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "isFullyPaused",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      { "name": "allPaused", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "name": "isPaused",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "scope",
+        "type": "uint8",
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "isPauser",
+    "type": "function",
+    "inputs": [
+      { "name": "account", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "lock",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "claimId", "type": "uint256", "internalType": "uint256" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      { "name": "actualLocked", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "pause",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "scope",
+        "type": "uint8",
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      },
+      { "name": "reason", "type": "string", "internalType": "string" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "removePauser",
+    "type": "function",
+    "inputs": [
+      { "name": "pauser", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "rulingExecutor",
+    "type": "function",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "stateMutability": "view"
+  },
+  {
+    "name": "setClaimsManager",
+    "type": "function",
+    "inputs": [
+      { "name": "claimsManager_", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "setRulingExecutor",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "rulingExecutor_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "slash",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "claimId", "type": "uint256", "internalType": "uint256" },
+      { "name": "recipient", "type": "address", "internalType": "address" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "unlock",
+    "type": "function",
+    "inputs": [
+      { "name": "agentId", "type": "uint256", "internalType": "uint256" },
+      { "name": "claimId", "type": "uint256", "internalType": "uint256" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "unpause",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "scope",
+        "type": "uint8",
+        "internalType": "enum ITrustfulPausable.PauseScope"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "name": "usdcToken",
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      { "name": "usdc", "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "view"
+  }
+]

@@ -54,10 +54,10 @@ function NetworkSwitchPrompt() {
           </div>
           <h1 className="text-2xl font-bold text-surface-100 mb-2">Wrong Network</h1>
           <p className="text-surface-400 mb-6">
-            Please switch to Base Sepolia testnet to use the Provider Dashboard.
+            Please switch to the correct network to use the Provider Dashboard.
           </p>
           <Alert variant="info" className="text-left mb-6">
-            Chain ID: 84532
+            Chain ID: {CHAIN_ID}
           </Alert>
           <Button variant="primary" className="w-full">
             Switch Network

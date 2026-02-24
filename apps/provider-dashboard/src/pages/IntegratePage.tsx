@@ -119,7 +119,7 @@ export default function IntegratePage() {
         <Card className="text-center">
           <Globe className="w-8 h-8 mx-auto mb-2 text-accent" />
           <p className="text-sm text-surface-400">Network</p>
-          <p className="font-semibold text-surface-100">Base Sepolia</p>
+          <p className="font-semibold text-surface-100">Eth Sepolia</p>
         </Card>
         <Card className="text-center">
           <Link2 className="w-8 h-8 mx-auto mb-2 text-accent" />
@@ -253,7 +253,7 @@ export default function IntegratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Contract Addresses</CardTitle>
-          <CardDescription>Base Sepolia (Chain ID: {CHAIN_ID})</CardDescription>
+          <CardDescription>Eth Sepolia (Chain ID: {CHAIN_ID})</CardDescription>
         </CardHeader>
 
         <div className="mt-4 space-y-3">
@@ -402,10 +402,10 @@ contract MyContract {
 
 function viemSnippet(agentId: string): string {
   return `import { createPublicClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 
 const client = createPublicClient({
-  chain: baseSepolia,
+  chain: sepolia,
   transport: http(),
 });
 

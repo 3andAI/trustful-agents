@@ -9,7 +9,7 @@
 // =============================================================================
 
 import { createPublicClient, http, type Address, type Chain } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { base, baseSepolia, sepolia } from 'viem/chains';
 
 // Re-export everything from the generated config
 export {
@@ -85,7 +85,7 @@ import {
 // Chain & Public Client
 // =============================================================================
 
-export const chain: Chain = CHAIN_ID === 8453 ? base : baseSepolia;
+export const chain: Chain = CHAIN_ID === 8453 ? base : CHAIN_ID === 11155111 ? sepolia : baseSepolia;
 
 export const publicClient = createPublicClient({
   chain,

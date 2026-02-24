@@ -1,0 +1,113 @@
+type CollateralLocked @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  claimId: BigInt! # uint256
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CollateralSlashed @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  claimId: BigInt! # uint256
+  recipient: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CollateralUnlocked @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  claimId: BigInt! # uint256
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Deposited @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  depositor: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type EmergencyWithdrawal @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  token: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Paused @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  scope: Int! # uint8
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PauserAdded @entity(immutable: true) {
+  id: Bytes!
+  pauser: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PauserRemoved @entity(immutable: true) {
+  id: Bytes!
+  pauser: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Unpaused @entity(immutable: true) {
+  id: Bytes!
+  by: Bytes! # address
+  scope: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type WithdrawalCancelled @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type WithdrawalExecuted @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  recipient: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type WithdrawalInitiated @entity(immutable: true) {
+  id: Bytes!
+  agentId: BigInt! # uint256
+  amount: BigInt! # uint256
+  executeAfter: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

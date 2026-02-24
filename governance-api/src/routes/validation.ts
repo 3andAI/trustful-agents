@@ -98,7 +98,7 @@ router.get('/agents/:agentId/agent-card.json', async (req: Request, res: Respons
         },
         {
           trait_type: 'Chain',
-          value: 'Base Sepolia',
+          value: 'Eth Sepolia',
         },
         {
           trait_type: 'Validator',
@@ -212,7 +212,7 @@ router.get('/agents/:agentId/image.svg', async (req: Request, res: Response) => 
   <text x="200" y="310" font-family="Arial" font-size="28" font-weight="bold" fill="#f8fafc" text-anchor="middle">${collateralAmount} USDC</text>
   
   <!-- Footer -->
-  <text x="200" y="360" font-family="Arial" font-size="12" fill="#64748b" text-anchor="middle">Trustful Agents · Base Sepolia</text>
+  <text x="200" y="360" font-family="Arial" font-size="12" fill="#64748b" text-anchor="middle">Trustful Agents · Eth Sepolia</text>
 </svg>`;
 
     res.setHeader('Content-Type', 'image/svg+xml');

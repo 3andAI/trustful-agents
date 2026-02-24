@@ -134,7 +134,7 @@ function MintAgentForm() {
           </div>
           <div>
             <CardTitle>Mint New Agent</CardTitle>
-            <CardDescription>Create a new ERC-8004 agent on Base Sepolia</CardDescription>
+            <CardDescription>Create a new ERC-8004 agent</CardDescription>
           </div>
         </div>
       </CardHeader>

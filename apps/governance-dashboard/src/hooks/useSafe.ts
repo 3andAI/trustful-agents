@@ -7,12 +7,9 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { chain } from '../config/contracts';
+import { chain, SAFE_TX_SERVICE_URL } from '../config/contracts';
 import { useWallet } from './useWallet';
 import { getSafeInfo, storePendingTransaction } from '../lib/api';
-
-// Safe Transaction Service URL
-const SAFE_TX_SERVICE_URL = 'https://safe-transaction-base-sepolia.safe.global';
 
 // Safe contract ABI (minimal for nonce)
 const SAFE_ABI = [

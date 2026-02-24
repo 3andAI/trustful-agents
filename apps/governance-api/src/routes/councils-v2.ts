@@ -235,17 +235,20 @@ router.get(
       
       // Import viem client
       const { createPublicClient, http } = await import('viem');
-      const { baseSepolia } = await import('viem/chains');
       
-      const RPC_URL = process.env.RPC_URL || 'https://sepolia.base.org';
+      // Use chain from centralized config
+      const { chain: configChain } = await import('../config/index.js');
+      const { RPC_URL: configRpcUrl } = await import('../config/index.js');
+      
       const client = createPublicClient({
-        chain: baseSepolia,
-        transport: http(RPC_URL),
+        chain: configChain,
+        transport: http(configRpcUrl),
       });
       
-      // Contract addresses
-      const TERMS_REGISTRY = (process.env.TERMS_REGISTRY_ADDRESS || '0x5Ae03075290e284ee05Fa648843F0ce81fffFA5d') as Address;
-      const COUNCIL_REGISTRY = (process.env.COUNCIL_REGISTRY_ADDRESS || '0x54996FAE14f35C32EfA2F0f92237e9B924a93F66') as Address;
+      // Contract addresses from centralized config
+      const { CONTRACTS } = await import('../config/index.js');
+      const TERMS_REGISTRY = CONTRACTS.termsRegistry as Address;
+      const COUNCIL_REGISTRY = CONTRACTS.councilRegistry as Address;
       
       const TermsRegistryABI = [
         {
